@@ -13,7 +13,7 @@ const version = "1.0.0"
 
 type config struct {
 	port int
-	env string
+	env  string
 }
 
 type application struct {
@@ -29,7 +29,7 @@ func main() {
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
 	flag.Parse()
 
-	logger := log.New(os.Stdout, "", log.Ldate | log.Ltime)
+	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
 	app := &application{
 		config: cfg,
@@ -40,10 +40,10 @@ func main() {
 	mux.HandleFunc("/api/v1/healthcheck", app.healthcheckHandler)
 
 	srv := &http.Server{
-		Addr: fmt.Sprintf(":%d", cfg.port),
-		Handler: mux,
-		IdleTimeout: time.Minute,
-		ReadTimeout: 10 * time.Second,
+		Addr:         fmt.Sprintf(":%d", cfg.port),
+		Handler:      app.routes(),
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
