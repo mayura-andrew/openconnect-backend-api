@@ -1,6 +1,9 @@
 package data
 
-import "time"
+import (
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
+	"time"
+)
 
 type Idea struct {
 	ID              int64     `json:"id"` // Unique identifier for the idea
@@ -25,4 +28,22 @@ type Comment struct {
 	CommentedBy int       `json:"commented_by"` // User ID of the person who made the comment
 	Content     string    `json:"content"`      // Content of the comment
 	CreatedAt   time.Time `json:"created_at"`   // Timestamp of when the comment was created
+}
+
+func ValidateIdea(v *validator.Validator, idea *Idea) {
+	v.Check(idea.Title != "", "title", "must be provided")
+	v.Check(len(idea.Title) <= 100, "title", "must not be more than 100 bytes long")
+
+	v.Check(idea.Description != "", "description", "must be provided")
+	v.Check(len(idea.Description) <= 1000, "description", "must not be more than 1000 bytes long")
+
+	v.Check(idea.Category != "", "category", "must be provided")
+	v.Check(len(idea.Category) <= 50, "category", "must not be more than 50 bytes long")
+
+	v.Check(idea.Tags != nil, "tags", "must be provided")
+	v.Check(len(idea.Tags) >= 1, "tags", "must contain at least one tag")
+	v.Check(validator.Unique(idea.Tags), "tags", "must not contain duplicate values")
+
+	v.Check(idea.SubmittedBy != 0, "submitted_by", "must be provided")
+	v.Check(idea.SubmittedBy > 0, "submitted_by", "must be a positive integer")
 }

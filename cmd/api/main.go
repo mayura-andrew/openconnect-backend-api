@@ -26,7 +26,7 @@ func main() {
 	var cfg config
 
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
-	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
+	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production|testing)")
 	flag.Parse()
 
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
@@ -35,9 +35,6 @@ func main() {
 		config: cfg,
 		logger: logger,
 	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/healthcheck", app.healthcheckHandler)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.port),
@@ -51,5 +48,4 @@ func main() {
 	err := srv.ListenAndServe()
 	logger.Fatal(err)
 
-	fmt.Println("Hello World!")
 }
