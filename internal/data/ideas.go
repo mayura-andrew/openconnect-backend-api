@@ -1,8 +1,12 @@
 package data
 
 import (
-	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
 )
 
 type Idea struct {
@@ -11,6 +15,7 @@ type Idea struct {
 	Title           string    `json:"title"`            // Title of the idea
 	Description     string    `json:"description"`      // Detailed description of the idea
 	Category        string    `json:"category"`         // Category of the idea
+	Pdf             string    `json:"pdf"`              // PDF file of the idea
 	Tags            []string  `json:"tags"`             // List of tags associated with the idea
 	SubmittedBy     int       `json:"submitted_by"`     // User ID of the person who submitted the idea
 	SubmittedAt     time.Time `json:"submitted_at"`     // Timestamp of when the idea was submitted
@@ -36,6 +41,21 @@ func ValidateIdea(v *validator.Validator, idea *Idea) {
 
 	v.Check(idea.Description != "", "description", "must be provided")
 	v.Check(len(idea.Description) <= 1000, "description", "must not be more than 1000 bytes long")
+
+	v.Check(idea.Pdf != "", "pdf", "must be provided")
+	v.Check(len(idea.Pdf) > 0, "pdf", "must not be empty")
+
+	isPDF := strings.EqualFold(filepath.Ext(idea.Pdf), ".pdf")
+
+	v.Check(isPDF, "pdf", "must be a PDF file")
+
+	fileInfo, err := os.Stat(idea.Pdf)
+	if err != nil {
+		v.AddError("pdf", "unable to get file into")
+	} else {
+		const maxPDFSize = 5 * 1024 * 1024 // 5MB
+		v.Check(fileInfo.Size() <= maxPDFSize, "pdf", "file size must be less than 5MB")
+	}
 
 	v.Check(idea.Category != "", "category", "must be provided")
 	v.Check(len(idea.Category) <= 50, "category", "must not be more than 50 bytes long")

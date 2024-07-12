@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/julienschmidt/httprouter"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type envelope map[string]any
@@ -43,7 +46,7 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 
-	maxBytes := 1_048_576 // 1MB
+	maxBytes := 1_048_576 * 5 // 1MB
 	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -87,6 +90,20 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
 		return errors.New("body must only contain a single JSON value")
+	}
+	return nil
+}
+
+func savePDFFile(pdfFile multipart.File, pdfPath string) error {
+	newPdfFile, err := os.Create(pdfPath)
+	if err != nil {
+		return errors.New("cannot create PDF file")
+	}
+	defer newPdfFile.Close()
+
+	_, err = io.Copy(newPdfFile, pdfFile)
+	if err != nil {
+		return errors.New("cannot save PDF file")
 	}
 	return nil
 }

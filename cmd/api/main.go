@@ -39,9 +39,10 @@ func main() {
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.port),
 		Handler:      app.routes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		MaxHeaderBytes: 100 << 20, // 1MB
 	}
 
 	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)

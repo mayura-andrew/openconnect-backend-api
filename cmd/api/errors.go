@@ -5,6 +5,10 @@ import (
 	"net/http"
 )
 
+type ValidationError struct {
+	Errors map[string]string
+}
+
 func (app *application) logError(r *http.Request, err error) {
 	app.logger.Print(err)
 }
@@ -42,4 +46,13 @@ func (app *application) badRequestResponse(w http.ResponseWriter, r *http.Reques
 
 func (app *application) failedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string) {
 	app.errorResponse(w, r, http.StatusUnprocessableEntity, errors)
+}
+
+
+func (ve ValidationError) Error() string {
+	var errStr string
+	for field, msg := range ve.Errors {
+		errStr += fmt.Sprintf("%s: %s\n", field, msg)
+	}
+	return errStr
 }
