@@ -1,6 +1,7 @@
 package data
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,4 +67,24 @@ func ValidateIdea(v *validator.Validator, idea *Idea) {
 
 	v.Check(idea.SubmittedBy != 0, "submitted_by", "must be provided")
 	v.Check(idea.SubmittedBy > 0, "submitted_by", "must be a positive integer")
+}
+
+type IdeaModel struct {
+	DB *sql.DB
+}
+
+func (i IdeaModel) Insert(idea *Idea) error {
+	return nil
+}
+
+func (i IdeaModel) Update(idea *Idea) error {
+	return nil
+}
+
+func (i IdeaModel) Get(id int64) (*Idea, error) {
+	return nil, nil
+}
+
+func (i IdeaModel) Delete(id int64) error {
+	return nil
 }
