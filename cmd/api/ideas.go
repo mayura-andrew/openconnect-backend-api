@@ -283,7 +283,7 @@ func (app *application) updateIdeaHandler(w http.ResponseWriter, r *http.Request
 		Title       *string   `json:"title"`
 		Description *string   `json:"description"`
 		Category    *string   `json:"category"`
-		Tags        *[]string `json:"tags"`
+		Tags        []string `json:"tags"`
 		PdfBase64   *string   `json:"pdfBase64"`
 	}
 
@@ -293,17 +293,33 @@ func (app *application) updateIdeaHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+
+
 	uniqueID, err := app.processAndSavePDF(*input.PdfBase64, w, r)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	idea.Title = *input.Title
-	idea.Description = *input.Description
-	idea.Category = *input.Category
-	idea.Tags = *input.Tags
-	idea.Pdf = uniqueID
+	if input.Title != nil {
+		idea.Title = *input.Title
+	}
+
+	if input.Description != nil {
+		idea.Description = *input.Description
+	}
+
+	if input.Category != nil {
+		idea.Category = *input.Category
+	}
+
+	if input.Tags != nil {
+		idea.Tags = input.Tags
+	}
+
+	if input.PdfBase64 != nil {
+		idea.Pdf = uniqueID
+	}
 
 	v := validator.New()
 
@@ -314,7 +330,12 @@ func (app *application) updateIdeaHandler(w http.ResponseWriter, r *http.Request
 
 	err = app.models.Ideas.Update(idea)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 

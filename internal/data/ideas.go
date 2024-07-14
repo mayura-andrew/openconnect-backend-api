@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -85,14 +86,17 @@ func (i IdeaModel) Insert(idea *Idea) error {
     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, version`
 
 	args := []any{idea.Title, idea.Description, idea.SubmittedBy, idea.Pdf, idea.Category, pq.Array(idea.Tags)}
-
-	return i.DB.QueryRow(query, args...).Scan(&idea.ID, &idea.CreatedAt, &idea.Version)
+	
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	
+	return i.DB.QueryRowContext(ctx, query, args...).Scan(&idea.ID, &idea.CreatedAt, &idea.Version)
 
 }
 
 func (i IdeaModel) Update(idea *Idea) error {
 	query := `UPDATE ideas 
-	SET title = $1, description = $2, submitted_by = $3, idea_source_id = $4, category = $5, tags = $6, version = version + 1 WHERE id = $7 RETURNING version`
+	SET title = $1, description = $2, submitted_by = $3, idea_source_id = $4, category = $5, tags = $6, version = version + 1 WHERE id = $7 AND version = $8 RETURNING version`
 
 	args := []any{
 		idea.Title,
@@ -102,9 +106,23 @@ func (i IdeaModel) Update(idea *Idea) error {
 		idea.Category,
 		pq.Array(idea.Tags),
 		idea.ID,
+		idea.Version,
 	}
 
-	return i.DB.QueryRow(query, args...).Scan(&idea.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+
+	err := i.DB.QueryRowContext(ctx,query, args...).Scan(&idea.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 func (i IdeaModel) Get(id uuid.UUID) (*Idea, error) {
@@ -114,7 +132,10 @@ func (i IdeaModel) Get(id uuid.UUID) (*Idea, error) {
 
 	var idea Idea
 
-	err := i.DB.QueryRow(query, id).Scan(
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := i.DB.QueryRowContext(ctx,query, id).Scan(
 		&idea.ID,
 		&idea.CreatedAt,
 		&idea.UpdatedAt,
@@ -148,7 +169,10 @@ func (i IdeaModel) Get(id uuid.UUID) (*Idea, error) {
 func (i IdeaModel) Delete(id uuid.UUID) error {
 	query := `DELETE FROM ideas WHERE id = $1`
 
-	result, err := i.DB.Exec(query, id)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := i.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
