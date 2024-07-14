@@ -1,15 +1,11 @@
 package main
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
-	"github.com/OpenConnectOUSL/backend-api-v1/internal/utils"
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
 	"github.com/google/uuid"
 )
@@ -43,51 +39,57 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-
-	pdfData, err := base64.StdEncoding.DecodeString(input.PDFBase64)
-    if err != nil {
-        app.badRequestResponse(w, r, err)
-        return
-    }
-
-
-	if !app.isPDF(pdfData) {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid pdf file"))
-		return
-	}
-
-	const maxPDFSize = 5 * 1024 * 1024 // 5MB
-	if len(pdfData) > maxPDFSize {
-		app.badRequestResponse(w, r, fmt.Errorf("pdf file size must be less than 5MB"))
-		return
-	}
-	// validation that pdf
-	// 1. is a pdf
-	// 2. size is less than 5MB
-	// 3. is not empty
-	// 4. is not nil
-	// 5. is not corrupted
-	// 6. is not password protected
-	// 7. is not encrypted
-	// 8. is not a malicious file
-
-	// save the pdf to a file
-	uploadsDir := "uploads"
-	err = os.MkdirAll(uploadsDir, 0755)
+	uniqueID, err := app.processAndSavePDF(input.PDFBase64, w, r)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	uniqueID := utils.GenerateUUID()
-	filenameWithID := uniqueID + ".pdf"
-	pdfPath := filepath.Join(uploadsDir, filenameWithID)
 
-	err = os.WriteFile(pdfPath, pdfData, 0644)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
+	// pdfData, err := base64.StdEncoding.DecodeString(input.PDFBase64)
+    // if err != nil {
+    //     app.badRequestResponse(w, r, err)
+    //     return
+    // }
+
+
+	// if !app.isPDF(pdfData) {
+	// 	app.badRequestResponse(w, r, fmt.Errorf("invalid pdf file"))
+	// 	return
+	// }
+
+	// const maxPDFSize = 5 * 1024 * 1024 // 5MB
+	// if len(pdfData) > maxPDFSize {
+	// 	app.badRequestResponse(w, r, fmt.Errorf("pdf file size must be less than 5MB"))
+	// 	return
+	// }
+	// // validation that pdf
+	// // 1. is a pdf
+	// // 2. size is less than 5MB
+	// // 3. is not empty
+	// // 4. is not nil
+	// // 5. is not corrupted
+	// // 6. is not password protected
+	// // 7. is not encrypted
+	// // 8. is not a malicious file
+
+	// // save the pdf to a file
+	// uploadsDir := "uploads"
+	// err = os.MkdirAll(uploadsDir, 0755)
+	// if err != nil {
+	// 	app.serverErrorResponse(w, r, err)
+	// 	return
+	// }
+
+	// uniqueID := utils.GenerateUUID()
+	// filenameWithID := uniqueID + ".pdf"
+	// pdfPath := filepath.Join(uploadsDir, filenameWithID)
+
+	// err = os.WriteFile(pdfPath, pdfData, 0644)
+	// if err != nil {
+	// 	app.serverErrorResponse(w, r, err)
+	// 	return
+	// }
 
 
 
@@ -254,6 +256,94 @@ func (app *application) showIdeaHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	err = app.writeJSON(w, http.StatusOK, envelope{"idea": idea}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) updateIdeaHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	idea, err := app.models.Ideas.Get(id)
+	if err != nil {
+		switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.notFoundResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	var input struct {
+		Title       *string   `json:"title"`
+		Description *string   `json:"description"`
+		Category    *string   `json:"category"`
+		Tags        *[]string `json:"tags"`
+		PdfBase64   *string   `json:"pdfBase64"`
+	}
+
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	uniqueID, err := app.processAndSavePDF(*input.PdfBase64, w, r)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	idea.Title = *input.Title
+	idea.Description = *input.Description
+	idea.Category = *input.Category
+	idea.Tags = *input.Tags
+	idea.Pdf = uniqueID
+
+	v := validator.New()
+
+	if data.ValidateIdea(v, idea); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	err = app.models.Ideas.Update(idea)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"idea": idea}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) deleteIdeaHandler(w http.ResponseWriter, r *http.Request) {
+
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	err = app.models.Ideas.Delete(id)
+	if err != nil {
+		switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.notFoundResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"message": "idea deleted successfully"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
