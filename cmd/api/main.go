@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
-	_ "github.com/lib/pq"
+	_"github.com/lib/pq"
 )
 
 const version = "1.0.0"
@@ -75,6 +75,7 @@ func main() {
 
 	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
 	err = srv.ListenAndServe()
+	err := srv.ListenAndServe()
 	logger.Fatal(err)
 
 }
@@ -103,4 +104,5 @@ func openDB(cfg config) (*sql.DB, error) {
 	}
 
 	return db, nil
+}
 }
