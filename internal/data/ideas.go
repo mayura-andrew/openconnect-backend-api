@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
@@ -187,4 +188,61 @@ func (i IdeaModel) Delete(id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+
+
+func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters)([]*Idea, error) {
+	query := fmt.Sprintf(`SELECT id, created_at, updated_at, title, description, submitted_by, idea_source_id, category, tags, upvotes, downvotes, status, comments, interested_users, version
+	FROM ideas 
+	WHERE (to_tsvector('english', title) @@ plainto_tsquery('english', $1) OR $1 = '') 
+	AND (tags @> $2 OR $2 = '{}') 
+	ORDER BY %s %s, id ASC`, filters.sortColumn(), filters.sortDirection())
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := i.DB.QueryContext(ctx, query, title, pq.Array(tags))
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ideas := []*Idea{}
+
+
+	for rows.Next() {
+		var idea Idea
+
+		err := rows.Scan(
+			&idea.ID,
+			&idea.CreatedAt,
+			&idea.UpdatedAt,
+			&idea.Title,
+			&idea.Description,
+			&idea.SubmittedBy,
+			&idea.Pdf,
+			&idea.Category,
+			pq.Array(&idea.Tags),
+			&idea.Upvotes,
+			&idea.Downvotes,
+			&idea.Status,
+			pq.Array(&idea.Comments),
+			pq.Array(&idea.InterestedUsers),
+			&idea.Version,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		ideas = append(ideas, &idea)
+
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ideas, nil
 }
