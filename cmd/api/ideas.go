@@ -45,54 +45,6 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-
-	// pdfData, err := base64.StdEncoding.DecodeString(input.PDFBase64)
-    // if err != nil {
-    //     app.badRequestResponse(w, r, err)
-    //     return
-    // }
-
-
-	// if !app.isPDF(pdfData) {
-	// 	app.badRequestResponse(w, r, fmt.Errorf("invalid pdf file"))
-	// 	return
-	// }
-
-	// const maxPDFSize = 5 * 1024 * 1024 // 5MB
-	// if len(pdfData) > maxPDFSize {
-	// 	app.badRequestResponse(w, r, fmt.Errorf("pdf file size must be less than 5MB"))
-	// 	return
-	// }
-	// // validation that pdf
-	// // 1. is a pdf
-	// // 2. size is less than 5MB
-	// // 3. is not empty
-	// // 4. is not nil
-	// // 5. is not corrupted
-	// // 6. is not password protected
-	// // 7. is not encrypted
-	// // 8. is not a malicious file
-
-	// // save the pdf to a file
-	// uploadsDir := "uploads"
-	// err = os.MkdirAll(uploadsDir, 0755)
-	// if err != nil {
-	// 	app.serverErrorResponse(w, r, err)
-	// 	return
-	// }
-
-	// uniqueID := utils.GenerateUUID()
-	// filenameWithID := uniqueID + ".pdf"
-	// pdfPath := filepath.Join(uploadsDir, filenameWithID)
-
-	// err = os.WriteFile(pdfPath, pdfData, 0644)
-	// if err != nil {
-	// 	app.serverErrorResponse(w, r, err)
-	// 	return
-	// }
-
-
-
 	idea := &data.Idea{
 		Title:       input.Title,
 		Description: input.Description,
