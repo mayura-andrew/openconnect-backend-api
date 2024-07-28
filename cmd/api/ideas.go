@@ -17,7 +17,7 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 		PDFBase64   string   `json:"pdfBase64"`
 		Category    string   `json:"category"`
 		Tags        []string `json:"tags"`
-		SubmittedBy string `json:"submitted_by"`
+		SubmittedBy string   `json:"submitted_by"`
 	}
 
 	err := app.readJSON(w, r, &input)
@@ -26,7 +26,7 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Validate the input data 
+	// Validate the input data
 
 	if len(input.SubmittedBy) != 36 {
 		app.badRequestResponse(w, r, fmt.Errorf("submitted_by must be a valid UUID of length 36"))
@@ -62,23 +62,23 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	err = app.models.Ideas.Insert(idea)
- 	if err != nil {
+	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
- 	}
+	}
 
- 	headers := make(http.Header)
- 	headers.Set("Location", fmt.Sprintf("/v1/ideas/%d", idea.ID))
- 	// Save the idea to the database or perform other necessary operations
-// 	// ...
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/ideas/%d", idea.ID))
+	// Save the idea to the database or perform other necessary operations
+	// 	// ...
 
 	err = app.writeJSON(w, http.StatusCreated, envelope{"idea": idea}, headers)
 
- 	if err != nil {
- 		app.serverErrorResponse(w, r, err)
- 	}
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 
- 	fmt.Fprintf(w, "%v\n", "Idea submitted successfully")
+	fmt.Fprintf(w, "%v\n", "Idea submitted successfully")
 
 }
 
@@ -110,7 +110,7 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	
+
 	// Convert the submitted_by string to int
 	submittedBy, err := strconv.Atoi(submittedByStr)
 	if err != nil {
@@ -201,10 +201,10 @@ func (app *application) showIdeaHandler(w http.ResponseWriter, r *http.Request) 
 	idea, err := app.models.Ideas.Get(id)
 	if err != nil {
 		switch {
-			case errors.Is(err, data.ErrRecordNotFound):
-				app.notFoundResponse(w, r)
-			default:
-				app.serverErrorResponse(w, r, err)
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -224,20 +224,20 @@ func (app *application) updateIdeaHandler(w http.ResponseWriter, r *http.Request
 	idea, err := app.models.Ideas.Get(id)
 	if err != nil {
 		switch {
-			case errors.Is(err, data.ErrRecordNotFound):
-				app.notFoundResponse(w, r)
-			default:
-				app.serverErrorResponse(w, r, err)
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	var input struct {
-		Title       *string   `json:"title"`
-		Description *string   `json:"description"`
-		Category    *string   `json:"category"`
+		Title       *string  `json:"title"`
+		Description *string  `json:"description"`
+		Category    *string  `json:"category"`
 		Tags        []string `json:"tags"`
-		PdfBase64   *string   `json:"pdfBase64"`
+		PdfBase64   *string  `json:"pdfBase64"`
 	}
 
 	err = app.readJSON(w, r, &input)
@@ -245,8 +245,6 @@ func (app *application) updateIdeaHandler(w http.ResponseWriter, r *http.Request
 		app.badRequestResponse(w, r, err)
 		return
 	}
-
-
 
 	uniqueID, err := app.processAndSavePDF(*input.PdfBase64, w, r)
 	if err != nil {
@@ -309,10 +307,10 @@ func (app *application) deleteIdeaHandler(w http.ResponseWriter, r *http.Request
 	err = app.models.Ideas.Delete(id)
 	if err != nil {
 		switch {
-			case errors.Is(err, data.ErrRecordNotFound):
-				app.notFoundResponse(w, r)
-			default:
-				app.serverErrorResponse(w, r, err)
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -325,9 +323,9 @@ func (app *application) deleteIdeaHandler(w http.ResponseWriter, r *http.Request
 
 func (app *application) listIdeasHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Title string
+		Title    string
 		Category string
-		Tags []string
+		Tags     []string
 		data.Filters
 	}
 
@@ -352,13 +350,13 @@ func (app *application) listIdeasHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ideas, err := app.models.Ideas.GetAllIdeas(input.Title, input.Tags, input.Filters)
+	ideas, metadata, err := app.models.Ideas.GetAllIdeas(input.Title, input.Tags, input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{"ideas": ideas}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"metadata": metadata, "ideas": ideas}, nil)
 
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
