@@ -18,6 +18,6 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPatch, "/v1/ideas/:id", app.updateIdeaHandler)
 	router.HandlerFunc(http.MethodDelete, "/v1/ideas/:id", app.deleteIdeaHandler)
 
-	return app.recoverPanic(router)
+	return app.recoverPanic(app.rateLimit(router))
 
 }
