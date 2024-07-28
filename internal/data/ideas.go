@@ -13,27 +13,27 @@ import (
 )
 
 type Idea struct {
-	ID              uuid.UUID     `json:"id"` // Unique identifier for the idea
-	CreatedAt       time.Time `json:"created_at"`
-	Title           string    `json:"title"`            // Title of the idea
-	Description     string    `json:"description"`      // Detailed description of the idea
-	Category        string    `json:"category"`         // Category of the idea
-	Pdf             string    `json:"pdf"`              // PDF file of the idea
-	Tags            []string  `json:"tags"`             // List of tags associated with the idea
-	SubmittedBy     uuid.UUID       `json:"submitted_by"`     // User ID of the person who submitted the idea
-	UpdatedAt     time.Time `json:"updated_at"`     // Timestamp of when the idea was submitted
-	Upvotes         int       `json:"upvotes"`          // Number of upvotes received
-	Downvotes       int       `json:"downvotes"`        // Number of downvotes received
-	Status          string    `json:"status"`           // Current status of the idea (e.g., pending, approved, rejected)
+	ID              uuid.UUID   `json:"id"` // Unique identifier for the idea
+	CreatedAt       time.Time   `json:"created_at"`
+	Title           string      `json:"title"`            // Title of the idea
+	Description     string      `json:"description"`      // Detailed description of the idea
+	Category        string      `json:"category"`         // Category of the idea
+	Pdf             string      `json:"pdf"`              // PDF file of the idea
+	Tags            []string    `json:"tags"`             // List of tags associated with the idea
+	SubmittedBy     uuid.UUID   `json:"submitted_by"`     // User ID of the person who submitted the idea
+	UpdatedAt       time.Time   `json:"updated_at"`       // Timestamp of when the idea was submitted
+	Upvotes         int         `json:"upvotes"`          // Number of upvotes received
+	Downvotes       int         `json:"downvotes"`        // Number of downvotes received
+	Status          string      `json:"status"`           // Current status of the idea (e.g., pending, approved, rejected)
 	Comments        []uuid.UUID `json:"comments"`         // List of comments on the idea
-	InterestedUsers []uuid.UUID    `json:"interested_users"` // List of user IDs who are interested in the idea
-	Version         int32     `json:"version"`
+	InterestedUsers []uuid.UUID `json:"interested_users"` // List of user IDs who are interested in the idea
+	Version         int32       `json:"version"`
 }
 
 type Comment struct {
-	ID          uuid.UUID       `json:"id"`           // Unique identifier for the comment
-	IdeaID      uuid.UUID       `json:"idea_id"`      // ID of the idea the comment is related to
-	CommentedBy uuid.UUID       `json:"commented_by"` // User ID of the person who made the comment
+	ID          uuid.UUID `json:"id"`           // Unique identifier for the comment
+	IdeaID      uuid.UUID `json:"idea_id"`      // ID of the idea the comment is related to
+	CommentedBy uuid.UUID `json:"commented_by"` // User ID of the person who made the comment
 	Content     string    `json:"content"`      // Content of the comment
 	CreatedAt   time.Time `json:"created_at"`   // Timestamp of when the comment was created
 }
@@ -78,6 +78,7 @@ func ValidateUUID(uuidStr string) bool {
 	_, err := uuid.Parse(uuidStr)
 	return err == nil
 }
+
 type IdeaModel struct {
 	DB *sql.DB
 }
@@ -87,10 +88,10 @@ func (i IdeaModel) Insert(idea *Idea) error {
     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, version`
 
 	args := []any{idea.Title, idea.Description, idea.SubmittedBy, idea.Pdf, idea.Category, pq.Array(idea.Tags)}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	
+
 	return i.DB.QueryRowContext(ctx, query, args...).Scan(&idea.ID, &idea.CreatedAt, &idea.Version)
 
 }
@@ -113,8 +114,7 @@ func (i IdeaModel) Update(idea *Idea) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-
-	err := i.DB.QueryRowContext(ctx,query, args...).Scan(&idea.Version)
+	err := i.DB.QueryRowContext(ctx, query, args...).Scan(&idea.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -136,7 +136,7 @@ func (i IdeaModel) Get(id uuid.UUID) (*Idea, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	err := i.DB.QueryRowContext(ctx,query, id).Scan(
+	err := i.DB.QueryRowContext(ctx, query, id).Scan(
 		&idea.ID,
 		&idea.CreatedAt,
 		&idea.UpdatedAt,
@@ -156,15 +156,15 @@ func (i IdeaModel) Get(id uuid.UUID) (*Idea, error) {
 
 	if err != nil {
 		switch {
-			case errors.Is(err, sql.ErrNoRows):
-				return nil, ErrRecordNotFound
-			default:
-				return nil, err
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
 		}
 	}
 
 	return &idea, nil
-	
+
 }
 
 func (i IdeaModel) Delete(id uuid.UUID) error {
@@ -190,31 +190,33 @@ func (i IdeaModel) Delete(id uuid.UUID) error {
 	return nil
 }
 
-
-
-func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters)([]*Idea, error) {
-	query := fmt.Sprintf(`SELECT id, created_at, updated_at, title, description, submitted_by, idea_source_id, category, tags, upvotes, downvotes, status, comments, interested_users, version
+func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters) ([]*Idea, Metadata, error) {
+	query := fmt.Sprintf(`SELECT count(*) OVER(), id, created_at, updated_at, title, description, submitted_by, idea_source_id, category, tags, upvotes, downvotes, status, comments, interested_users, version
 	FROM ideas 
 	WHERE (to_tsvector('english', title) @@ plainto_tsquery('english', $1) OR $1 = '') 
 	AND (tags @> $2 OR $2 = '{}') 
-	ORDER BY %s %s, id ASC`, filters.sortColumn(), filters.sortDirection())
+	ORDER BY %s %s, id ASC
+	LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rows, err := i.DB.QueryContext(ctx, query, title, pq.Array(tags))
+	args := []any{title, pq.Array(tags), filters.limit(), filters.offset()}
 
+	rows, err := i.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 	defer rows.Close()
 
+	totalRecords := 0
 	ideas := []*Idea{}
-
 
 	for rows.Next() {
 		var idea Idea
 
 		err := rows.Scan(
+			&totalRecords,
 			&idea.ID,
 			&idea.CreatedAt,
 			&idea.UpdatedAt,
@@ -233,7 +235,7 @@ func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters)([]*
 		)
 
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
 
 		ideas = append(ideas, &idea)
@@ -241,8 +243,10 @@ func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters)([]*
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
-	return ideas, nil
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return ideas, metadata, nil
 }
