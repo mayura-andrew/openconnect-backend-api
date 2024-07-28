@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/jsonlog"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
-	_"github.com/lib/pq"
+	_ "github.com/lib/pq"
 )
 
 const version = "1.0.0"
@@ -19,8 +20,8 @@ const version = "1.0.0"
 type config struct {
 	port int
 	env  string
-	db 	 struct {
-		dsn string
+	db   struct {
+		dsn          string
 		maxOpenConns int
 		maxIdleConns int
 		maxIdleTime  string
@@ -29,7 +30,7 @@ type config struct {
 
 type application struct {
 	config config
-	logger *log.Logger
+	logger *jsonlog.Logger
 	models data.Models
 }
 
@@ -44,20 +45,19 @@ func main() {
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
 
-
 	flag.Parse()
 
-	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
 	db, err := openDB(cfg)
 	if err != nil {
-		logger.Fatal(err)
+		logger.PrintFatal(err, nil)
 	}
 
 	defer db.Close()
 
-	logger.Printf("database connection pool established")
-	
+	logger.PrintInfo("database connection pool established", nil)
+
 	app := &application{
 		config: cfg,
 		logger: logger,
@@ -65,17 +65,21 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      app.routes(),
-		IdleTimeout:  120 * time.Second,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 120 * time.Second,
+		Addr:           fmt.Sprintf(":%d", cfg.port),
+		Handler:        app.routes(),
+		ErrorLog:       log.New(logger, "", 0),
+		IdleTimeout:    120 * time.Second,
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   120 * time.Second,
 		MaxHeaderBytes: 100 << 20, // 1MB
 	}
 
-	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
+	logger.PrintInfo("starting server ", map[string]string{
+		"addr": srv.Addr,
+		"env":  cfg.env,
+	})
 	err = srv.ListenAndServe()
-	logger.Fatal(err)
+	logger.PrintFatal(err, nil)
 
 }
 
@@ -87,13 +91,13 @@ func openDB(cfg config) (*sql.DB, error) {
 
 	db.SetMaxOpenConns(cfg.db.maxOpenConns)
 	db.SetMaxIdleConns(cfg.db.maxIdleConns)
-	
+
 	duration, err := time.ParseDuration(cfg.db.maxIdleTime)
 	if err != nil {
 		return nil, err
 	}
 	db.SetConnMaxIdleTime(duration)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
