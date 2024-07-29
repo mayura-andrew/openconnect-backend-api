@@ -5,24 +5,19 @@ import (
 	"errors"
 )
 
-
-
-
-
-
-
-
 var (
 	ErrRecordNotFound = errors.New("record not found")
-	ErrEditConflict = errors.New("edit conflict")
+	ErrEditConflict   = errors.New("edit conflict")
 )
 
 type Models struct {
 	Ideas IdeaModel
+	Users UserModal
 }
 
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Ideas: IdeaModel{DB: db},
+		Users: UserModal{DB: db},
 	}
 }
