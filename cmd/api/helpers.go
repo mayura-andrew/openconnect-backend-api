@@ -25,7 +25,7 @@ type envelope map[string]any
 func (app *application) readIDParam(r *http.Request) (uuid.UUID, error) {
 	params := httprouter.ParamsFromContext(r.Context())
 
-	idStr:= params.ByName("id")
+	idStr := params.ByName("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		return uuid.Nil, errors.New("invalid id parameter")
@@ -34,22 +34,22 @@ func (app *application) readIDParam(r *http.Request) (uuid.UUID, error) {
 }
 
 func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
-    js, err := json.Marshal(data)
-    if err != nil {
-        return err
-    }
-    js = append(js, '\n')
+	js, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	js = append(js, '\n')
 
-    for key, value := range headers {
-        w.Header()[key] = value
-    }
-    w.Header().Set("Content-Type", "application/json")
+	for key, value := range headers {
+		w.Header()[key] = value
+	}
+	w.Header().Set("Content-Type", "application/json")
 
-    // Use http.StatusText to get the status text for the given status code
-    w.Header().Set("Status", http.StatusText(status))
+	// Use http.StatusText to get the status text for the given status code
+	w.Header().Set("Status", http.StatusText(status))
 
-    _, err = w.Write(js)
-    return err
+	_, err = w.Write(js)
+	return err
 }
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
@@ -102,7 +102,7 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 	return nil
 }
 
-func (app *application) isPDF (data []byte) bool {
+func (app *application) isPDF(data []byte) bool {
 	return bytes.HasPrefix(data, []byte("%PDF-"))
 }
 
@@ -125,11 +125,13 @@ func (app *application) processAndSavePDF(inputBase64 string, w http.ResponseWri
 	}
 
 	// save the pdf to a file
-	uploadsDir := "uploads"
-	err = os.MkdirAll(uploadsDir, 0755)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return "no key", err
+	uploadsDir := "../../uploads"
+	if _, err := os.Stat(uploadsDir); os.IsNotExist(err) {
+		err = os.MkdirAll(uploadsDir, 0755)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return "no key", err
+		}
 	}
 
 	// generate a random filename
@@ -176,6 +178,6 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 		v.AddError(key, "must be an integer")
 		return defaultValue
 	}
-	
+
 	return i
 }
