@@ -4,10 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/jsonlog"
-	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -58,7 +55,9 @@ func main() {
 	flag.Parse()
 
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
-
+	if logger == nil {
+		panic("Logger is not initialized")
+	}
 	db, err := openDB(cfg)
 	if err != nil {
 		logger.PrintFatal(err, nil)
@@ -74,22 +73,10 @@ func main() {
 		models: data.NewModels(db),
 	}
 
-	srv := &http.Server{
-		Addr:           fmt.Sprintf(":%d", cfg.port),
-		Handler:        app.routes(),
-		ErrorLog:       log.New(logger, "", 0),
-		IdleTimeout:    120 * time.Second,
-		ReadTimeout:    15 * time.Second,
-		WriteTimeout:   120 * time.Second,
-		MaxHeaderBytes: 100 << 20, // 1MB
+	err = app.serve()
+	if err != nil {
+		logger.PrintFatal(err, nil)
 	}
-
-	logger.PrintInfo("starting server ", map[string]string{
-		"addr": srv.Addr,
-		"env":  cfg.env,
-	})
-	err = srv.ListenAndServe()
-	logger.PrintFatal(err, nil)
 
 }
 
