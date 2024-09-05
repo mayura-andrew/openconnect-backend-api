@@ -4,10 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"github.com/OpenConnectOUSL/backend-api-v1/internal/jsonlog"
+	"fmt"
 	"os"
+	"strconv"
+	"sync"
 	"time"
 
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/jsonlog"
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/mailer"
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
 	_ "github.com/lib/pq"
 )
@@ -28,12 +32,21 @@ type config struct {
 		burst   int
 		enabled bool
 	}
+	smtp struct {
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
+	}
 }
 
 type application struct {
 	config config
 	logger *jsonlog.Logger
 	models data.Models
+	mailer mailer.Mailer
+	wg     sync.WaitGroup
 }
 
 func main() {
@@ -52,6 +65,26 @@ func main() {
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 
+	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("SMTPHOST"), "SMTP host")
+
+	envSMTPPort := os.Getenv("SMTPPORT")
+
+	if envSMTPPort == "" {
+		envSMTPPort = "587"
+		fmt.Println("SMTPPORT is not set. Defaulting to 587")
+	}
+
+	intSMTPPort, err := strconv.Atoi(envSMTPPort)
+	if err != nil {
+		fmt.Println("SMTPPORT is not a number. Defaulting to 587")
+		intSMTPPort = 587
+	}
+
+	flag.IntVar(&cfg.smtp.port, "smtp-port", intSMTPPort, "SMTP port")
+
+	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("SMTPUSERNAME"), "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("SMTPPASS"), "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("SMTPSENDER"), "SMTP sender")
 	flag.Parse()
 
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
@@ -71,6 +104,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 
 	err = app.serve()
