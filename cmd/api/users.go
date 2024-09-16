@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -54,14 +53,18 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
+	
+	err = app.models.Permissions.AddForUser(user.ID, "ideas:read")
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
 
 	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
-
-	fmt.Println(token.Plaintext)
 
 	app.background(func() {
 
@@ -123,6 +126,13 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 		default: 
 			app.serverErrorResponse(w, r, err)
 		}
+		return
+	}
+
+	err = app.models.Permissions.AddForUser(user.ID, "ideas:write")
+	
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
