@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -110,7 +111,8 @@ func (app *application) createPasswordResetTokenHandler(w http.ResponseWriter, r
 		emailData := map[string]any{
 			"passwordResetToken": token.Plaintext,
 		}
-		err = app.mailer.Send(user.Email, "token_password_reset.tmpl", emailData)
+		fmt.Println(emailData)
+		err = app.mailer.Send(user.Email, "password_reset", emailData)
 		if err != nil {
 			app.logger.PrintError(err, nil)
 		}
