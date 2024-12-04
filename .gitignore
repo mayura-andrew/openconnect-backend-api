@@ -10,6 +10,14 @@
 /bin/
 /main
 
+
+
+
+
+
+
+
+
 # Dependency directories (remove the comment below if you want to check in your vendor directory)
 # /vendor/
 
@@ -38,3 +46,9 @@ Thumbs.db
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+
+
+
+
+
