@@ -21,8 +21,11 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
 	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
 
-	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.createAuthenticationTokenHandler)
-	router.HandlerFunc(http.MethodPost, "/v1/tokens/password-reset", app.createPasswordResetTokenHandler)
+	router.HandlerFunc(http.MethodPost, "/v1/auth/tokens/authentication", app.createAuthenticationTokenHandler)
+	router.HandlerFunc(http.MethodPost, "/v1/auth/tokens/password-reset", app.createPasswordResetTokenHandler)
+
+	router.HandlerFunc(http.MethodPost, "/v1/auth/google/login", app.googleLoginHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/auth/google/callback", app.googleCallbackHandler)
 	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
 
 }

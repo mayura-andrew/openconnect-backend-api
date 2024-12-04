@@ -1,39 +1,63 @@
-version: '3.8'
-
 services:
   db:
-    image: postgres:13
+    container_name: openconnect-db
+    image: postgres:15-alpine
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: openconnect
+      POSTGRES_PASSWORD: 1234
       POSTGRES_DB: openconnect
-    volumes:
-      - db_data:/var/lib/postgresql/data
     ports:
-      - "5434:5432"
-
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user"]
+      test: ["CMD-SHELL", "pg_isready -U openconnect -d openconnect"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  api:
+  migrations:
+    container_name: openconnect-migrations
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      DB_DSN: postgres://user:password@db:5432/openconnect?sslmode=disable
-      SMTPPORT: ${SMTPPORT}
-      SMTPSENDER: ${SMTPSENDER}
-      SMTPHOST: ${SMTPHOST}
-      SMTPUSERNAME: ${SMTPUSERNAME}
-      SMTPPASS: ${SMTPPASS}
-    ports:
-      - "4000:4000"
+    command: ["/usr/local/bin/migrate", "-path", "/migrations", "-database", "postgres://openconnect:1234@db:5432/openconnect?sslmode=disable", "force", "0"]
+    networks:
+      - app-network
     depends_on:
       db:
         condition: service_healthy
 
+  api:
+    container_name: openconnect-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_DSN: postgres://openconnect:1234@db:5432/openconnect?sslmode=disable
+      SMTP_PORT: 587  # Add missing SMTP env vars
+      SMTP_HOST: "${SMTP_HOST}"
+      SMTP_USERNAME: "${SMTP_USERNAME}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD}"
+      SMTP_SENDER: "${SMTP_SENDER}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      GOOGLE_REDIRECT_URL: "${GOOGLE_REDIRECT_URL}"
+    ports:
+      - "4000:4000"
+    networks:
+      - app-network
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+networks:
+  app-network:
+    name: openconnect-network
+    driver: bridge
+
 volumes:
-  db_data:
+  postgres_data:
+    name: openconnect-data

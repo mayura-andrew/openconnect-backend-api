@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/jsonlog"
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/mailer"
-	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
 	_ "github.com/lib/pq"
+	"golang.org/x/oauth2"
 )
 
 const version = "1.0.0"
@@ -39,6 +41,11 @@ type config struct {
 		password string
 		sender   string
 	}
+	oauth struct {
+		googleClientID string
+		googleClientSecret string
+		redirectURL string
+	}
 }
 
 type application struct {
@@ -47,6 +54,7 @@ type application struct {
 	models data.Models
 	mailer mailer.Mailer
 	wg     sync.WaitGroup
+	googleOauthConfig *oauth2.Config
 }
 
 func main() {
@@ -87,6 +95,11 @@ func main() {
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("SMTPSENDER"), "SMTP sender")
 	flag.Parse()
 
+	// Add OAuth config
+	flag.StringVar(&cfg.oauth.googleClientID, "oauth-google-client-id", os.Getenv("OAUTH_GOOGLE_CLIENT_ID"), "Google OAuth Client ID")
+	flag.StringVar(&cfg.oauth.googleClientSecret, "oauth-google-client-secret", os.Getenv("OAUTH_GOOGLE_CLIENT_SECRET"), "Google OAuth Client Secret")
+	flag.StringVar(&cfg.oauth.redirectURL, "oauth-redirect-url", os.Getenv("OAUTH_REDIRECT_URL"), "OAuth Redirect URL")
+
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 	if logger == nil {
 		panic("Logger is not initialized")
@@ -107,6 +120,8 @@ func main() {
 		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 
+	app.initGoogleOAuth()
+	
 	err = app.serve()
 	if err != nil {
 		logger.PrintFatal(err, nil)
@@ -115,6 +130,15 @@ func main() {
 }
 
 func openDB(cfg config) (*sql.DB, error) {
+
+	dsn := cfg.db.dsn
+    if !strings.Contains(dsn, "sslmode=") {
+        if strings.Contains(dsn, "?") {
+            dsn += "&sslmode=disable"
+        } else {
+            dsn += "?sslmode=disable"
+        }
+    }
 	db, err := sql.Open("postgres", cfg.db.dsn)
 	if err != nil {
 		return nil, err

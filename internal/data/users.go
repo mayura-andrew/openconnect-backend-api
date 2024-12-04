@@ -2,8 +2,10 @@ package data
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"time"
 
@@ -215,4 +217,43 @@ var AnonymousUser = &User{}
 
 func (u *User) IsAnonymous() bool {
 	return u == AnonymousUser
+}
+
+type GoogleUser struct {
+    ID            string `json:"id"`
+    Email         string `json:"email"`
+    VerifiedEmail bool   `json:"verified_email"`
+    Name          string `json:"name"`
+    Picture       string `json:"picture"`
+}
+
+func (m UserModal) FindOrCreateFromGoogle(googleUser *GoogleUser) (*User, error) {
+    // Try to find existing user by email
+    user, err := m.GetByEmail(googleUser.Email)
+    if err == nil {
+        return user, nil
+    }
+    
+    // If user doesn't exist, create new one
+    if errors.Is(err, ErrRecordNotFound) {
+        user = &User{
+            Name:      googleUser.Name,
+            Email:     googleUser.Email,
+            Activated: googleUser.VerifiedEmail,
+        }
+        
+        // Generate random password for Google users
+        randomPassword := make([]byte, 32)
+        rand.Read(randomPassword)
+        user.Password.Set(base64.URLEncoding.EncodeToString(randomPassword))
+        
+        err = m.Insert(user)
+        if err != nil {
+            return nil, err
+        }
+        
+        return user, nil
+    }
+    
+    return nil, err
 }
