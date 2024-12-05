@@ -42,18 +42,18 @@ type config struct {
 		sender   string
 	}
 	oauth struct {
-		googleClientID string
+		googleClientID     string
 		googleClientSecret string
-		redirectURL string
+		redirectURL        string
 	}
 }
 
 type application struct {
-	config config
-	logger *jsonlog.Logger
-	models data.Models
-	mailer mailer.Mailer
-	wg     sync.WaitGroup
+	config            config
+	logger            *jsonlog.Logger
+	models            data.Models
+	mailer            mailer.Mailer
+	wg                sync.WaitGroup
 	googleOauthConfig *oauth2.Config
 }
 
@@ -63,7 +63,7 @@ func main() {
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production|testing)")
 
-	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("OPENCONNECT_DB_DSN"), "PostgreSQL DSN")
+	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("DB_DSN"), "PostgreSQL DSN")
 
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
@@ -121,7 +121,7 @@ func main() {
 	}
 
 	app.initGoogleOAuth()
-	
+
 	err = app.serve()
 	if err != nil {
 		logger.PrintFatal(err, nil)
@@ -132,13 +132,13 @@ func main() {
 func openDB(cfg config) (*sql.DB, error) {
 
 	dsn := cfg.db.dsn
-    if !strings.Contains(dsn, "sslmode=") {
-        if strings.Contains(dsn, "?") {
-            dsn += "&sslmode=disable"
-        } else {
-            dsn += "?sslmode=disable"
-        }
-    }
+	if !strings.Contains(dsn, "sslmode=") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&sslmode=disable"
+		} else {
+			dsn += "?sslmode=disable"
+		}
+	}
 	db, err := sql.Open("postgres", cfg.db.dsn)
 	if err != nil {
 		return nil, err
