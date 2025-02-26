@@ -28,7 +28,7 @@ RUN apk --no-cache add ca-certificates tzdata postgresql-client
 # Copy migrate binary from builder
 COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 
-# Copy compiled application
+# Copy compiled application and migrations
 COPY --from=builder /app/main .
 COPY --from=builder /app/migrations ./migrations
 
@@ -43,8 +43,8 @@ ENV GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 ENV GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 ENV GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
 
-# Add migration script
-COPY scripts/wait-for-db.sh .
-RUN chmod +x wait-for-db.sh
+# Add entrypoint script
+COPY scripts/entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-CMD ["./wait-for-db.sh", "./main"]
+ENTRYPOINT ["./entrypoint.sh"]

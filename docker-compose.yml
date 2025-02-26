@@ -18,18 +18,6 @@ services:
       timeout: 5s
       retries: 5
 
-  migrations:
-    container_name: openconnect-migrations
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["/usr/local/bin/migrate", "-path", "/migrations", "-database", "postgres://openconnect:1234@db:5432/openconnect?sslmode=disable", "force", "0"]
-    networks:
-      - app-network
-    depends_on:
-      db:
-        condition: service_healthy
-
   api:
     container_name: openconnect-api
     build:
@@ -37,11 +25,11 @@ services:
       dockerfile: Dockerfile
     environment:
       DB_DSN: postgres://openconnect:1234@db:5432/openconnect?sslmode=disable
-      SMTP_PORT: 587  # Add missing SMTP env vars
-      SMTP_HOST: "${SMTP_HOST}"
-      SMTP_USERNAME: "${SMTP_USERNAME}"
-      SMTP_PASSWORD: "${SMTP_PASSWORD}"
-      SMTP_SENDER: "${SMTP_SENDER}"
+      SMTP_PORT: 587
+      SMTP_HOST: "${SMTPHOST}"
+      SMTP_USERNAME: "${SMTPUSERNAME}"
+      SMTP_PASSWORD: "${SMTPPASS}"
+      SMTP_SENDER: "${SMTPSENDER}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
       GOOGLE_REDIRECT_URL: "${GOOGLE_REDIRECT_URL}"
@@ -50,14 +38,12 @@ services:
     networks:
       - app-network
     depends_on:
-      migrations:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
 
 networks:
   app-network:
-    name: openconnect-network
     driver: bridge
 
 volumes:
   postgres_data:
-    name: openconnect-data

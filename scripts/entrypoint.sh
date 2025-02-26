@@ -12,5 +12,8 @@ until pg_isready -h "$HOST" -U "$USER" -d "$DB"; do
   sleep 2
 done
 
-echo "PostgreSQL is ready!"
-exec "$@"
+echo "Running migrations..."
+/usr/local/bin/migrate -path /migrations -database "postgres://openconnect:1234@db:5432/openconnect?sslmode=disable" up
+
+echo "Starting application..."
+exec ./main
