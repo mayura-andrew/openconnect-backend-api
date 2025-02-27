@@ -28,9 +28,9 @@ func New(host string, port int, username, password, sender string) Mailer {
 func (m Mailer) Send(recipient, templateType string, data any) error {
 	var tempFile string
 	if templateType == "user_welcome" {
-		tempFile = "/home/andrew/dev/openconnect/openconnect-backend-api/internal/mailer/templates/user_welcome.tmpl"
+		tempFile = "./internal/mailer/templates/user_welcome.tmpl"
 	} else if templateType == "password_reset" {
-		tempFile = "/home/andrew/dev/openconnect/openconnect-backend-api/internal/mailer/templates/token_password_reset.tmpl"
+		tempFile = "./internal/mailer/templates/token_password_reset.tmpl"
 	}
 	tmpl, err := template.ParseFiles(tempFile)
 	if err != nil {

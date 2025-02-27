@@ -23,6 +23,15 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	_, err = app.models.Users.GetByEmail(input.Email)
+	if err == nil {
+		app.failedValidationResponse(w, r, map[string]string{"email": "a user with this email address already exists"})
+		return
+	} else if !errors.Is(err, data.ErrRecordNotFound) {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	user := &data.User{
 		Name:      input.Name,
 		Email:     input.Email,
@@ -70,7 +79,8 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 		emailData := map[string]any{
 			"activationToken": token.Plaintext,
-			"userID":          user.ID,
+			"userName":        user.Name,
+			"frontendURL":     app.config.frontendURL,
 		}
 		err = app.mailer.Send(user.Email, "user_welcome", emailData)
 		if err != nil {

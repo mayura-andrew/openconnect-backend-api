@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -22,7 +23,7 @@ type GoogleUser struct {
 
 func (app *application) initGoogleOAuth() {
 	app.googleOauthConfig = &oauth2.Config{
-		RedirectURL:  app.config.oauth.redirectURL,
+		RedirectURL:  app.config.oauth.redirectURI,
 		ClientID:     app.config.oauth.googleClientID,
 		ClientSecret: app.config.oauth.googleClientSecret,
 		Scopes: []string{
@@ -79,6 +80,18 @@ func (app *application) googleCallbackHandler(w http.ResponseWriter, r *http.Req
 	googleUser, err := app.getGoogleUserInfo(token.AccessToken)
 	if err != nil {
 		app.logger.PrintError(err, map[string]string{"message": "Failed to get Google user info"})
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	_, err = app.models.Users.GetByEmail(googleUser.Email)
+	if err == nil {
+		app.logger.PrintInfo("OAuth signup attempted with existing email", map[string]string{
+			"email": googleUser.Email,
+		})
+		app.failedValidationResponse(w, r, map[string]string{"email": "a user with this email address already exists"})
+		return
+	} else if !errors.Is(err, data.ErrRecordNotFound) {
 		app.serverErrorResponse(w, r, err)
 		return
 	}

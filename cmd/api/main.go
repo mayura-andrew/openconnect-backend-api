@@ -44,8 +44,9 @@ type config struct {
 	oauth struct {
 		googleClientID     string
 		googleClientSecret string
-		redirectURL        string
+		redirectURI        string
 	}
+	frontendURL string
 }
 
 type application struct {
@@ -72,8 +73,8 @@ func main() {
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
-
 	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("SMTPHOST"), "SMTP host")
+	flag.StringVar(&cfg.frontendURL, "frontend-url", os.Getenv("FRONTEND_URL"), "Frontend URL")
 
 	envSMTPPort := os.Getenv("SMTPPORT")
 
@@ -89,16 +90,15 @@ func main() {
 	}
 
 	flag.IntVar(&cfg.smtp.port, "smtp-port", intSMTPPort, "SMTP port")
-
 	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("SMTPUSERNAME"), "SMTP username")
 	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("SMTPPASS"), "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("SMTPSENDER"), "SMTP sender")
 	flag.Parse()
 
 	// Add OAuth config
-	flag.StringVar(&cfg.oauth.googleClientID, "oauth-google-client-id", os.Getenv("OAUTH_GOOGLE_CLIENT_ID"), "Google OAuth Client ID")
-	flag.StringVar(&cfg.oauth.googleClientSecret, "oauth-google-client-secret", os.Getenv("OAUTH_GOOGLE_CLIENT_SECRET"), "Google OAuth Client Secret")
-	flag.StringVar(&cfg.oauth.redirectURL, "oauth-redirect-url", os.Getenv("OAUTH_REDIRECT_URL"), "OAuth Redirect URL")
+	flag.StringVar(&cfg.oauth.googleClientID, "oauth-google-client-id", os.Getenv("GOOGLE_CLIENT_ID"), "Google OAuth Client ID")
+	flag.StringVar(&cfg.oauth.googleClientSecret, "oauth-google-client-secret", os.Getenv("GOOGLE_CLIENT_SECRET"), "Google OAuth Client Secret")
+	flag.StringVar(&cfg.oauth.redirectURI, "oauth-redirect-url", os.Getenv("GOOGLE_REDIRECT_URI"), "OAuth Redirect URL")
 
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 	if logger == nil {

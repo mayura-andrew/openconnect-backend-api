@@ -31,6 +31,7 @@ COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 # Copy compiled application and migrations
 COPY --from=builder /app/main .
 COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/internal/mailer/templates ./internal/mailer/templates
 
 # Environment variables
 ENV DB_DSN=${DB_DSN}
@@ -41,8 +42,8 @@ ENV SMTPUSERNAME=${SMTPUSERNAME}
 ENV SMTPPASS=${SMTPPASS}
 ENV GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 ENV GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-ENV GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
-
+ENV GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+ENV FRONTEND_URL=${FRONTEND_URL}
 # Add entrypoint script
 COPY scripts/entrypoint.sh .
 RUN chmod +x entrypoint.sh

@@ -25,14 +25,15 @@ services:
       dockerfile: Dockerfile
     environment:
       DB_DSN: postgres://openconnect:1234@db:5432/openconnect?sslmode=disable
-      SMTP_PORT: 587
-      SMTP_HOST: "${SMTPHOST}"
-      SMTP_USERNAME: "${SMTPUSERNAME}"
-      SMTP_PASSWORD: "${SMTPPASS}"
-      SMTP_SENDER: "${SMTPSENDER}"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
-      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
-      GOOGLE_REDIRECT_URL: "${GOOGLE_REDIRECT_URL}"
+      SMTPPORT: ${SMTPPORT}
+      SMTPHOST: ${SMTPHOST}
+      SMTPUSERNAME: ${SMTPUSERNAME}
+      SMTPPASS: ${SMTPPASS}
+      SMTPSENDER: ${SMTPSENDER}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      FRONTEND_URL: ${FRONTEND_URL}
     ports:
       - "4000:4000"
     networks:

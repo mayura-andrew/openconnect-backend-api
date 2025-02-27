@@ -1,20 +1,17 @@
 {{define "subject"}}Welcome to OpenConnect!{{end}}
+
 {{define "plainBody"}}
-
-
-
-
-
 Hi,
-Thanks for signing up for a OpenConnect. We're exicited to habr you on board. Let's get started by verifying your email address. Just click the link below to verify your email address.
 
-For future reference, your user ID number is {{.userID}}.
-Please send a request to the `PUT /v1/users/activated` endpoint with the following JSON
-body to activate your account:
-{"token": "{{.activationToken}}"}
-Please note that this is a one-time use token and it will expire in 3 days.
+Thanks for signing up for OpenConnect. We're excited to have you on board!
+
+To activate your account, please click the following link:
+{{.frontendURL}}/auth/activate?token={{.activationToken}}
+
+
+This activation link will expire in 3 days.
+
 Thanks,
-
 The OpenConnect Team
 {{end}}
 
@@ -22,21 +19,41 @@ The OpenConnect Team
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width" />
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <style>
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+    </style>
 </head>
-<body>
-<p>Hi,</p>
-<p>Thanks for signing up for a OpenConnect. We're exicited to habr you on board. Let's get started by verifying your email address. Just click the link below to verify your email address.</p>
-<p>For future reference, your user ID number is {{.userID}}.
-Please send a request to the `PUT /v1/users/activated` endpoint with the following JSON
-body to activate your account:
-{"token": "{{.activationToken}}"}
-Please note that this is a one-time use token and it will expire in 3 days.
-Thanks, </p>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; padding: 20px;">
+    <h2>Welcome to OpenConnect!</h2>
+    <p>Hi,</p>
+    <p>Thanks for signing up for OpenConnect. We're excited to have you on board!</p>
 
-<p>The OpenConnect Team</p>
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{{.frontendURL}}/auth/activate?token={{.activationToken}}" class="button" style="background-color: #4CAF50; color: white; padding: 15px 32px; text-decoration: none; border-radius: 4px;">
+            Activate Your Account
+        </a>
+    </div>
 
+    <p>If the button doesn't work, copy and paste this link in your browser:</p>
+    <p>{{.frontendURL}}/auth/activate?token={{.activationToken}}</p>
+
+    <p><small>This activation link will expire in 3 days.</small></p>
+
+    <p>Thanks,<br>The OpenConnect Team</p>
 </body>
 </html>
 {{end}}
