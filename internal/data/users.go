@@ -21,9 +21,10 @@ var (
 type User struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
-	Name      string    `json:"name"`
+	UserName  string    `json:"username"`
 	Email     string    `json:"email"`
 	Password  password  `json:"-"`
+	UserType  string    `json:"user_type"`
 	Activated bool      `json:"activated"`
 	Version   int       `json:"version"`
 }
@@ -70,8 +71,8 @@ func ValidatePasswordPlaintext(v *validator.Validator, password string) {
 }
 
 func ValidateUser(v *validator.Validator, user *User) {
-	v.Check(user.Name != "", "name", "must be provided")
-	v.Check(len(user.Name) <= 500, "name", "must not be more than 500 bytes long")
+	v.Check(user.UserName != "", "name", "must be provided")
+	v.Check(len(user.UserName) <= 500, "name", "must not be more than 500 bytes long")
 
 	ValidateEmail(v, user.Email)
 
@@ -90,11 +91,11 @@ type UserModal struct {
 }
 
 func (m UserModal) Insert(user *User) error {
-	query := `INSERT INTO users (name, email, password_hash, activated) 
-			VALUES ($1, $2, $3, $4) 
+	query := `INSERT INTO users (user_name, email, password_hash, user_type, activated) 
+			VALUES ($1, $2, $3, $4, $5) 
 			RETURNING id, created_at, version`
 
-	args := []any{user.Name, user.Email, user.Password.hash, user.Activated}
+	args := []any{user.UserName, user.Email, user.Password.hash, user.UserType, user.Activated}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -112,7 +113,7 @@ func (m UserModal) Insert(user *User) error {
 }
 
 func (m UserModal) GetByEmail(email string) (*User, error) {
-	query := `SELECT id, created_at, name, email, password_hash, activated, version
+	query := `SELECT id, created_at, user_name, email, password_hash, user_type, activated, version
       		  FROM users
       		  WHERE email = $1`
 
@@ -124,9 +125,10 @@ func (m UserModal) GetByEmail(email string) (*User, error) {
 	err := m.DB.QueryRowContext(ctx, query, email).Scan(
 		&user.ID,
 		&user.CreatedAt,
-		&user.Name,
+		&user.UserName,
 		&user.Email,
 		&user.Password.hash,
+		&user.UserType,
 		&user.Activated,
 		&user.Version)
 
@@ -143,12 +145,12 @@ func (m UserModal) GetByEmail(email string) (*User, error) {
 
 func (m UserModal) Update(user *User) error {
 	query := `UPDATE users
-			SET name = $1, email = $2, password_hash = $3, activated = $4, version = version + 1
+			SET user_name = $1, email = $2, password_hash = $3, activated = $4, version = version + 1
 			WHERE id = $5 AND version = $6
 			RETURNING version`
 
 	args := []any{
-		user.Name,
+		user.UserName,
 		user.Email,
 		user.Password.hash,
 		user.Activated,
@@ -176,7 +178,7 @@ func (m UserModal) Update(user *User) error {
 func (m UserModal) GetForToken(tokenScope, tokenPlainText string) (*User, error) {
 	tokenHash := sha256.Sum256([]byte(tokenPlainText))
 
-	query := `SELECT users.id, users.created_at, users.name, users.email, users.password_hash, users.activated, users.version
+	query := `SELECT users.id, users.created_at, users.user_name, users.email, users.password_hash, users.user_type, users.activated, users.version
 	FROM users
 	INNER JOIN tokens
 	ON users.id = tokens.user_id
@@ -195,9 +197,10 @@ func (m UserModal) GetForToken(tokenScope, tokenPlainText string) (*User, error)
 	err := m.DB.QueryRowContext(ctx, query, args...).Scan(
 		&user.ID,
 		&user.CreatedAt,
-		&user.Name,
+		&user.UserName,
 		&user.Email,
 		&user.Password.hash,
+		&user.UserType,
 		&user.Activated,
 		&user.Version,
 	)
@@ -205,7 +208,7 @@ func (m UserModal) GetForToken(tokenScope, tokenPlainText string) (*User, error)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			return nil, ErrRecordNotFound
-		default: 
+		default:
 			return nil, err
 		}
 	}
@@ -220,40 +223,41 @@ func (u *User) IsAnonymous() bool {
 }
 
 type GoogleUser struct {
-    ID            string `json:"id"`
-    Email         string `json:"email"`
-    VerifiedEmail bool   `json:"verified_email"`
-    Name          string `json:"name"`
-    Picture       string `json:"picture"`
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	VerifiedEmail bool   `json:"verified_email"`
+	Name          string `json:"name"`
+	Picture       string `json:"picture"`
 }
 
 func (m UserModal) FindOrCreateFromGoogle(googleUser *GoogleUser) (*User, error) {
-    // Try to find existing user by email
-    user, err := m.GetByEmail(googleUser.Email)
-    if err == nil {
-        return user, nil
-    }
-    
-    // If user doesn't exist, create new one
-    if errors.Is(err, ErrRecordNotFound) {
-        user = &User{
-            Name:      googleUser.Name,
-            Email:     googleUser.Email,
-            Activated: googleUser.VerifiedEmail,
-        }
-        
-        // Generate random password for Google users
-        randomPassword := make([]byte, 32)
-        rand.Read(randomPassword)
-        user.Password.Set(base64.URLEncoding.EncodeToString(randomPassword))
-        
-        err = m.Insert(user)
-        if err != nil {
-            return nil, err
-        }
-        
-        return user, nil
-    }
-    
-    return nil, err
+	// Try to find existing user by email
+	user, err := m.GetByEmail(googleUser.Email)
+	if err == nil {
+		return user, nil
+	}
+
+	// If user doesn't exist, create new one
+	if errors.Is(err, ErrRecordNotFound) {
+		user = &User{
+			UserName:  googleUser.Name,
+			Email:     googleUser.Email,
+			UserType:  "normal",
+			Activated: googleUser.VerifiedEmail,
+		}
+
+		// Generate random password for Google users
+		randomPassword := make([]byte, 32)
+		rand.Read(randomPassword)
+		user.Password.Set(base64.URLEncoding.EncodeToString(randomPassword))
+
+		err = m.Insert(user)
+		if err != nil {
+			return nil, err
+		}
+
+		return user, nil
+	}
+
+	return nil, err
 }

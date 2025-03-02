@@ -12,7 +12,7 @@ import (
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name     string `json:"name"`
+		UserName string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
@@ -33,8 +33,9 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	user := &data.User{
-		Name:      input.Name,
+		UserName:  input.UserName,
 		Email:     input.Email,
+		UserType:  "normal",
 		Activated: false,
 	}
 
@@ -79,7 +80,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 		emailData := map[string]any{
 			"activationToken": token.Plaintext,
-			"userName":        user.Name,
+			"userName":        user.UserName,
 			"frontendURL":     app.config.frontendURL,
 		}
 		err = app.mailer.Send(user.Email, "user_welcome", emailData)
@@ -191,6 +192,23 @@ func (app *application) updateUserPasswordHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	err = user.Password.Set(input.Password)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.models.Users.Update(user)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+	
 	err = app.models.Tokens.DeleteAllForUser(data.ScopePasswordReset, user.ID)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)

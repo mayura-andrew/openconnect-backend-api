@@ -110,6 +110,7 @@ func (app *application) createPasswordResetTokenHandler(w http.ResponseWriter, r
 	app.background(func() {
 		emailData := map[string]any{
 			"passwordResetToken": token.Plaintext,
+			"frontendURL":        app.config.frontendURL,
 		}
 		fmt.Println(emailData)
 		err = app.mailer.Send(user.Email, "password_reset", emailData)

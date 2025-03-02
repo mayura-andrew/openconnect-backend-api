@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -84,12 +85,21 @@ func (app *application) googleCallbackHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	_, err = app.models.Users.GetByEmail(googleUser.Email)
+	existingUser, err := app.models.Users.GetByEmail(googleUser.Email)
 	if err == nil {
-		app.logger.PrintInfo("OAuth signup attempted with existing email", map[string]string{
-			"email": googleUser.Email,
+		authToken, err := app.models.Tokens.New(existingUser.ID, 24*time.Hour, data.ScopeAuthentication)
+		if err != nil {
+			app.logger.PrintError(err, map[string]string{"message": "Failed to generate authentication token"})
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+
+		redirectURL := fmt.Sprintf("%s/auth/callback?token=%s", app.config.frontendURL, authToken.Plaintext)
+		app.logger.PrintInfo("Redirecting existing user to frontend", map[string]string{
+			"email": existingUser.Email,
+			"url":   redirectURL,
 		})
-		app.failedValidationResponse(w, r, map[string]string{"email": "a user with this email address already exists"})
+		http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 		return
 	} else if !errors.Is(err, data.ErrRecordNotFound) {
 		app.serverErrorResponse(w, r, err)
@@ -112,11 +122,11 @@ func (app *application) googleCallbackHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusCreated, envelope{"authentication_token": authToken}, nil)
-	if err != nil {
-		app.logger.PrintError(err, map[string]string{"message": "Failed to write JSON response"})
-		app.serverErrorResponse(w, r, err)
-	}
+	redirectURL := fmt.Sprintf("%s/auth/callback?token=%s", app.config.frontendURL, authToken.Plaintext)
+	app.logger.PrintInfo("Redirecting to frontend", map[string]string{
+		"url": redirectURL,
+	})
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func generateStateOauthCookie(w http.ResponseWriter) string {
