@@ -1,39 +1,50 @@
-version: '3.8'
-
 services:
   db:
-    image: postgres:13
+    container_name: openconnect-db
+    image: postgres:15-alpine
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: openconnect
+      POSTGRES_PASSWORD: 1234
       POSTGRES_DB: openconnect
-    volumes:
-      - db_data:/var/lib/postgresql/data
     ports:
-      - "5434:5432"
-
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user"]
+      test: ["CMD-SHELL", "pg_isready -U openconnect -d openconnect"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   api:
+    container_name: openconnect-api
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      DB_DSN: postgres://user:password@db:5432/openconnect?sslmode=disable
+      DB_DSN: postgres://openconnect:1234@db:5432/openconnect?sslmode=disable
       SMTPPORT: ${SMTPPORT}
-      SMTPSENDER: ${SMTPSENDER}
       SMTPHOST: ${SMTPHOST}
       SMTPUSERNAME: ${SMTPUSERNAME}
       SMTPPASS: ${SMTPPASS}
+      SMTPSENDER: ${SMTPSENDER}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      FRONTEND_URL: ${FRONTEND_URL}
     ports:
       - "4000:4000"
+    networks:
+      - app-network
     depends_on:
       db:
         condition: service_healthy
 
+networks:
+  app-network:
+    driver: bridge
+
 volumes:
-  db_data:
+  postgres_data:
