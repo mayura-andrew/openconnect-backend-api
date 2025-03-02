@@ -1,6 +1,8 @@
 module github.com/OpenConnectOUSL/backend-api-v1
 
-go 1.22.4
+go 1.23.0
+
+toolchain go1.23.6
 
 require (
 	github.com/google/uuid v1.6.0
@@ -17,7 +19,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
-	golang.org/x/oauth2 v0.24.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/time v0.5.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )
