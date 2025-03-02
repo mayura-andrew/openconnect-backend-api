@@ -1,58 +1,51 @@
-# Stage 1: Builder Stage
-FROM golang:1.22 AS builder
+# Build stage
+FROM golang:1.23-alpine AS builder
 
-# Set the working directory inside the container
+# Install migrate
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+# Install required build dependencies
+RUN apk --no-cache add gcc musl-dev
+
 WORKDIR /app
 
-# Copy the Go modules manifests
+# Copy go mod files
 COPY go.mod go.sum ./
-
-# Download Go modules
 RUN go mod download
 
-# Copy the source code
+# Copy source code
 COPY . .
 
-# Build the Go application with CGO disabled and list files for debugging
-RUN CGO_ENABLED=0 GOOS=linux go build -o app ./cmd/api && ls -l /app
+# Build the application
+RUN CGO_ENABLED=1 GOOS=linux go build -o main ./cmd/api
 
-# Stage 2: Final Image
+# Final stage
 FROM alpine:latest
 
-# Set the working directory inside the container
-WORKDIR /root/
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates tzdata postgresql-client
 
-# Copy the binary from the builder stage
-COPY --from=builder /app/app .
+# Copy migrate binary from builder
+COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 
-# Ensure the binary is executable
-RUN chmod +x ./app
+# Copy compiled application and migrations
+COPY --from=builder /app/main .
+COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/internal/mailer/templates ./internal/mailer/templates
 
-# Copy the .env file
-COPY .env .
+# Environment variables
+ENV DB_DSN=${DB_DSN}
+ENV SMTPPORT=${SMTPPORT}
+ENV SMTPSENDER=${SMTPSENDER}
+ENV SMTPHOST=${SMTPHOST}
+ENV SMTPUSERNAME=${SMTPUSERNAME}
+ENV SMTPPASS=${SMTPPASS}
+ENV GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+ENV GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+ENV GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+ENV FRONTEND_URL=${FRONTEND_URL}
+# Add entrypoint script
+COPY scripts/entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-# List files in the final image for debugging
-RUN ls -l /root
-
-# Copy the migration files
-COPY ./migrations ./migrations
- 
-# Copy the email template file
-COPY ./internal/mailer/templates/user_welcome.tmpl ./internal/mailer/templates/user_welcome.tmpl
-
-# Install necessary tools
-RUN apk add --no-cache bash
-
-# Expose the application port
-EXPOSE 4000
-
-# Set environment variables
-ENV DB_DSN=postgres://username:password@db:5432/openconnect?sslmode=disable \
-    SMTPPORT= \
-    SMTPSENDER= \
-    SMTPHOST= \
-    SMTPUSERNAME= \
-    SMTPPASS= 
-
-# Command to run the application
-CMD ["./app"]
+ENTRYPOINT ["./entrypoint.sh"]
