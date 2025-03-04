@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
 	"io"
 	"net/http"
 	"net/url"
@@ -193,4 +194,31 @@ func (app *application) background(fn func()) {
 		}()
 		fn()
 	}()
+}
+
+func (app *application) validateProfile(v *validator.Validator, profile *data.Profile) {
+	v.Check(profile.UserID != uuid.Nil, "user_id", "must be provided")
+
+	// Optional validations for specific fields
+	if profile.Title != "" {
+		v.Check(len(profile.Title) <= 100, "title", "must not be more than 100 bytes long")
+	}
+
+	if profile.Bio != "" {
+		v.Check(len(profile.Bio) <= 1000, "bio", "must not be more than 1000 bytes long")
+	}
+
+	// Validate skills if provided
+	if profile.Skills != nil {
+		v.Check(len(profile.Skills) <= 20, "skills", "must not contain more than 20 skills")
+
+		for i, skill := range profile.Skills {
+			v.Check(len(skill) <= 50, fmt.Sprintf("skills[%d]", i), "must not be more than 50 bytes long")
+		}
+	}
+}
+
+func (app *application) readStringParam(r *http.Request, paramName string) string {
+	params := httprouter.ParamsFromContext(r.Context())
+	return params.ByName(paramName)
 }
