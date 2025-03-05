@@ -19,6 +19,7 @@ type Profile struct {
 	Faculty   string    `json:"faculty,omitempty"`
 	Program   string    `json:"program,omitempty"`
 	Degree    string    `json:"degree,omitempty"`
+	Year      string    `json:"year,omitempty"`
 	Uni       string    `json:"uni,omitempty"`
 	Mobile    string    `json:"mobile,omitempty"`
 	LinkedIn  string    `json:"linkedin,omitempty"`
@@ -36,6 +37,7 @@ type UserProfile struct {
 	UserType            string    `json:"user_type"`
 	Firstname           string    `json:"firstname,omitempty"`
 	Lastname            string    `json:"lastname,omitempty"`
+	Year				string    `json:"year,omitempty"`
 	Avatar              string    `json:"avatar,omitempty"`
 	Title               string    `json:"title,omitempty"`
 	Bio                 string    `json:"bio,omitempty"`
@@ -60,7 +62,7 @@ type ProfileModel struct {
 func (m ProfileModel) GetByUserID(userID uuid.UUID) (*Profile, error) {
 	query := `
 		SELECT user_id, firstname, lastname, avatar, title, bio, faculty, 
-		       program, degree, uni, mobile, linkedin, github, fb, 
+		       program, degree, year, uni, mobile, linkedin, github, fb, 
 		       created_at, updated_at
 		FROM user_profiles
 		WHERE user_id = $1`
@@ -80,6 +82,7 @@ func (m ProfileModel) GetByUserID(userID uuid.UUID) (*Profile, error) {
 		&profile.Faculty,
 		&profile.Program,
 		&profile.Degree,
+		&profile.Year,
 		&profile.Uni,
 		&profile.Mobile,
 		&profile.LinkedIn,
@@ -137,7 +140,7 @@ func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 	query := `
 		SELECT u.id, u.user_name, u.email, u.user_type, u.created_at,
 		       p.firstname, p.lastname, p.avatar, p.title, p.bio, 
-		       p.faculty, p.program, p.degree, p.uni, p.mobile, 
+		       p.faculty, p.program, p.degree, p.year, p.uni, p.mobile, 
 		       p.linkedin, p.github, p.fb, p.updated_at
 		FROM users u
 		LEFT JOIN user_profiles p ON u.id = p.user_id
@@ -145,7 +148,7 @@ func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 
 	var profile UserProfile
 	var firstname, lastname, avatar, title, bio sql.NullString
-	var faculty, program, degree, uni, mobile sql.NullString
+	var faculty, program, degree, year, uni, mobile sql.NullString
 	var linkedin, github, fb sql.NullString
 	var updatedAt sql.NullTime
 
@@ -166,6 +169,7 @@ func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 		&faculty,
 		&program,
 		&degree,
+		&year,
 		&uni,
 		&mobile,
 		&linkedin,
@@ -207,6 +211,9 @@ func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 	}
 	if degree.Valid {
 		profile.Degree = degree.String
+	}
+	if year.Valid {
+		profile.Year = year.String
 	}
 	if uni.Valid {
 		profile.Uni = uni.String
@@ -270,7 +277,7 @@ func (m ProfileModel) GetByUsername(username string) (*UserProfile, error) {
 	query := `
 		SELECT u.id, u.user_name, u.email, u.user_type, u.created_at,
 		       p.firstname, p.lastname, p.avatar, p.title, p.bio, 
-		       p.faculty, p.program, p.degree, p.uni, p.mobile, 
+		       p.faculty, p.program, p.degree, p.year, p.uni, p.mobile, 
 		       p.linkedin, p.github, p.fb, p.updated_at
 		FROM users u
 		LEFT JOIN user_profiles p ON u.id = p.user_id
@@ -278,7 +285,7 @@ func (m ProfileModel) GetByUsername(username string) (*UserProfile, error) {
 
 	var profile UserProfile
 	var firstname, lastname, avatar, title, bio sql.NullString
-	var faculty, program, degree, uni, mobile sql.NullString
+	var faculty, program, degree, year, uni, mobile sql.NullString
 	var linkedin, github, fb sql.NullString
 	var updatedAt sql.NullTime
 
@@ -299,6 +306,7 @@ func (m ProfileModel) GetByUsername(username string) (*UserProfile, error) {
 		&faculty,
 		&program,
 		&degree,
+		&year,
 		&uni,
 		&mobile,
 		&linkedin,
@@ -345,6 +353,9 @@ func (m ProfileModel) GetByUsername(username string) (*UserProfile, error) {
 	}
 	if degree.Valid {
 		profile.Degree = degree.String
+	}
+	if year.Valid {
+		profile.Year = year.String
 	}
 	if uni.Valid {
 		profile.Uni = uni.String
@@ -407,8 +418,8 @@ func (m ProfileModel) GetByUsername(username string) (*UserProfile, error) {
 func (m ProfileModel) Insert(profile *Profile) error {
 	query := `
 		INSERT INTO user_profiles 
-		(user_id, firstname, lastname, avatar, title, bio, faculty, program, degree, uni, mobile, linkedin, github, fb)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		(user_id, firstname, lastname, avatar, title, bio, faculty, program, degree, year, uni, mobile, linkedin, github, fb)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING created_at, updated_at`
 
 	args := []any{
@@ -420,6 +431,7 @@ func (m ProfileModel) Insert(profile *Profile) error {
 		profile.Bio,
 		profile.Faculty,
 		profile.Program,
+		profile.Year,
 		profile.Degree,
 		profile.Uni,
 		profile.Mobile,
@@ -451,8 +463,8 @@ func (m ProfileModel) Update(profile *Profile) error {
 	query := `
 		UPDATE user_profiles
 		SET firstname = $1, lastname = $2, avatar = $3, title = $4, bio = $5,
-		    faculty = $6, program = $7, degree = $8, uni = $9, mobile = $10,
-		    linkedin = $11, github = $12, fb = $13,  updated_at = NOW()
+		    faculty = $6, program = $7, degree = $8, year=$9 uni = $10, mobile = $11,
+		    linkedin = $12, github = $13, fb = $14,  updated_at = NOW()
 		WHERE user_id = $14
 		RETURNING updated_at`
 
@@ -465,6 +477,7 @@ func (m ProfileModel) Update(profile *Profile) error {
 		profile.Faculty,
 		profile.Program,
 		profile.Degree,
+		profile.Year,
 		profile.Uni,
 		profile.Mobile,
 		profile.LinkedIn,
@@ -536,7 +549,7 @@ func (m ProfileModel) Search(query string, limit int, offset int) ([]*UserProfil
 	sqlQuery := `
 		SELECT u.id, u.user_name, u.email, u.user_type, u.created_at,
 		       p.firstname, p.lastname, p.avatar, p.title, p.bio, 
-		       p.faculty, p.program, p.degree, p.uni, p.mobile, 
+		       p.faculty, p.program, p.degree, p.year, p.uni, p.mobile, 
 		       p.linkedin, p.github, p.fb, p.updated_at
 		FROM users u
 		LEFT JOIN user_profiles p ON u.id = p.user_id
@@ -570,7 +583,7 @@ func (m ProfileModel) Search(query string, limit int, offset int) ([]*UserProfil
 	for rows.Next() {
 		var profile UserProfile
 		var firstname, lastname, avatar, title, bio sql.NullString
-		var faculty, program, degree, uni, mobile sql.NullString
+		var faculty, program, degree, year, uni, mobile sql.NullString
 		var linkedin, github, fb sql.NullString
 		var updatedAt sql.NullTime
 
@@ -588,6 +601,7 @@ func (m ProfileModel) Search(query string, limit int, offset int) ([]*UserProfil
 			&faculty,
 			&program,
 			&degree,
+			&year,
 			&uni,
 			&mobile,
 			&linkedin,
@@ -623,6 +637,9 @@ func (m ProfileModel) Search(query string, limit int, offset int) ([]*UserProfil
 		}
 		if degree.Valid {
 			profile.Degree = degree.String
+		}
+		if year.Valid {
+			profile.Year = year.String
 		}
 		if uni.Valid {
 			profile.Uni = uni.String

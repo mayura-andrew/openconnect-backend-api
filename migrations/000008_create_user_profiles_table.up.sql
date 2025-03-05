@@ -8,6 +8,7 @@ CREATE TABLE user_profiles (
     faculty TEXT DEFAULT NULL,
     program TEXT DEFAULT NULL,
     degree TEXT DEFAULT NULL,
+    year TEXT DEFAULT NULL,
     uni TEXT DEFAULT NULL,
     mobile TEXT DEFAULT NULL,
     linkedin TEXT DEFAULT NULL,

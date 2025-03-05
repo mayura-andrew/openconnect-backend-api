@@ -237,6 +237,7 @@ func (m UserModal) FindOrCreateFromGoogle(googleUser *GoogleUser) (*User, error)
 		return user, nil
 	}
 
+	
 	// If user doesn't exist, create new one
 	if errors.Is(err, ErrRecordNotFound) {
 		user = &User{

@@ -34,6 +34,7 @@ func (app *application) createProfileHandler(w http.ResponseWriter, r *http.Requ
 		Faculty   string   `json:"faculty"`
 		Program   string   `json:"program"`
 		Degree    string   `json:"degree"`
+		Year      string   `json:"year"`
 		Uni       string   `json:"uni"`
 		Mobile    string   `json:"mobile"`
 		LinkedIn  string   `json:"linkedin"`
@@ -48,12 +49,19 @@ func (app *application) createProfileHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	avatarID, err := app.processAndSaveAvatar(input.Avatar, w, r)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("Avatar ID:", avatarID)
+
 	// Create a new profile
 	profile := &data.Profile{
 		UserID:    user.ID,
 		Firstname: input.Firstname,
 		Lastname:  input.Lastname,
-		Avatar:    input.Avatar,
+		Avatar:    avatarID,
 		Title:     input.Title,
 		Bio:       input.Bio,
 		Faculty:   input.Faculty,
@@ -136,8 +144,13 @@ func (app *application) updateProfileHandler(w http.ResponseWriter, r *http.Requ
 	if input.Lastname != nil {
 		profile.Lastname = *input.Lastname
 	}
-	if input.Avatar != nil {
-		profile.Avatar = *input.Avatar
+	if input.Avatar != nil && *input.Avatar != "" {
+		// Process and save new avatar image
+		avatarID, err := app.processAndSaveAvatar(*input.Avatar, w, r)
+		if err != nil {
+			return
+		}
+		profile.Avatar = avatarID
 	}
 	if input.Title != nil {
 		profile.Title = *input.Title

@@ -28,8 +28,8 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/auth/google/login", app.googleLoginHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/auth/google/callback", app.googleCallbackHandler)
 
-	router.HandlerFunc(http.MethodGet, "/v1/profile", app.requirePermission("ideas:read", app.getProfileHandler))
-	router.HandlerFunc(http.MethodGet, "/v1/profiles/search", app.requirePermission("ideas:read", app.searchProfilesHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/profile", app.getProfileHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/profiles/search",  app.searchProfilesHandler)
 	router.HandlerFunc(http.MethodPut, "/v1/profile/new", app.requirePermission("ideas:write", app.createProfileHandler))
 	router.HandlerFunc(http.MethodPatch, "/v1/profile/update", app.requirePermission("ideas:write", app.updateProfileHandler))
 	router.HandlerFunc(http.MethodDelete, "/v1/profile/delete", app.requirePermission("ideas:write", app.deleteProfileHandler))

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
 
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/utils"
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
@@ -145,6 +146,78 @@ func (app *application) processAndSavePDF(inputBase64 string, w http.ResponseWri
 		app.serverErrorResponse(w, r, err)
 		return "no key", err
 	}
+	return unique, nil
+}
+
+func (app *application) processAndSaveAvatar(inputBase64 string, w http.ResponseWriter, r *http.Request) (string, error) {
+	if inputBase64 == "" {
+		return "no key", nil
+	}
+
+	imgData, err := base64.StdEncoding.DecodeString(inputBase64)
+
+	fmt.Println("imgData", imgData)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return "", fmt.Errorf("invalid image file", err)
+	}
+
+	if len(imgData) < 8 {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid image file"))
+		return "", err
+	}
+
+	isJPEG := bytes.HasPrefix(imgData, []byte{0xFF, 0xD8, 0xFF})
+	isPNG := bytes.HasPrefix(imgData, []byte{0x89, 0x50, 0x4E, 0x47})
+	isGIF := bytes.HasPrefix(imgData, []byte{0x47, 0x49, 0x46, 0x38})
+
+	if !isJPEG && !isPNG && !isGIF {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid image file"))
+		return "", fmt.Errorf("unsupported image format", err)
+	}
+
+	const maxImageSize = 5 * 1024 * 1024 // 5MB
+	if len(imgData) > maxImageSize {
+		app.badRequestResponse(w, r, fmt.Errorf("image file size must be less than 5MB"))
+		return "", fmt.Errorf("image too large", err)
+	}
+
+	// save the image to a file
+
+	uploadsDir := "../../uploads/avatars"
+	if _, err := os.Stat(uploadsDir); os.IsNotExist(err) {
+		err = os.MkdirAll(uploadsDir, 0755)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return "", err
+		}
+	}
+
+	unique := utils.GenerateUUID()
+
+	var extension string
+
+	if isJPEG {
+		extension = ".jpg"
+	} else if isPNG {
+		extension = ".png"
+	} else if isGIF {
+		extension = ".gif"
+	}
+
+
+	filenameWithId := unique + extension
+	avatarPath := filepath.Join(uploadsDir, filenameWithId)
+
+	fmt.Println("avatarPath", avatarPath)
+	
+
+	err = os.WriteFile(avatarPath, imgData, 0644)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return "", err
+	}
+
 	return unique, nil
 }
 
