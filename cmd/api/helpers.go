@@ -205,12 +205,10 @@ func (app *application) processAndSaveAvatar(inputBase64 string, w http.Response
 		extension = ".gif"
 	}
 
-
 	filenameWithId := unique + extension
 	avatarPath := filepath.Join(uploadsDir, filenameWithId)
 
 	fmt.Println("avatarPath", avatarPath)
-	
 
 	err = os.WriteFile(avatarPath, imgData, 0644)
 	if err != nil {
@@ -219,6 +217,49 @@ func (app *application) processAndSaveAvatar(inputBase64 string, w http.Response
 	}
 
 	return unique, nil
+}
+
+func (app *application) getAvatarBase64(avatarID string) (string, error) {
+	if avatarID == "" || avatarID == "no key" {
+		return "", nil
+	}
+	extensions := []string{".jpg", ".png", ".gif"}
+	var found bool
+	var filePath string
+
+	for _, ext := range extensions {
+		filePath = filepath.Join("../../uploads/avatars", avatarID+ext)
+		if _, err := os.Stat(filePath); err == nil {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return "", fmt.Errorf("avatar file not found for ID: %s", avatarID)
+	}
+
+	fileData, err := os.ReadFile(filePath)
+
+	if err != nil {
+		return "", err
+	}
+
+	var contentType string
+	switch filepath.Ext(filePath) {
+	case ".jpg":
+		contentType = "image/jpeg"
+	case ".png":
+		contentType = "image/png"
+	case ".gif":
+		contentType = "image/gif"
+	default:
+		contentType = "application/octet-stream"
+	}
+
+	avatarBase64 := "data:" + contentType + ";base64," + base64.StdEncoding.EncodeToString(fileData)
+
+	return avatarBase64, nil
 }
 
 func (app *application) readString(qs url.Values, key string, defaultValue string) string {

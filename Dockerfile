@@ -32,6 +32,7 @@ COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY --from=builder /app/main .
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/internal/mailer/templates ./internal/mailer/templates
+COPY --from=builder /app/uploads ./uploads
 
 # Environment variables
 ENV DB_DSN=${DB_DSN}

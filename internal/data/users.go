@@ -243,7 +243,7 @@ func (m UserModal) FindOrCreateFromGoogle(googleUser *GoogleUser) (*User, error)
 		user = &User{
 			UserName:  googleUser.Name,
 			Email:     googleUser.Email,
-			UserType:  "normal",
+			UserType:  "google",
 			Activated: googleUser.VerifiedEmail,
 		}
 

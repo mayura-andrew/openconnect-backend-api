@@ -14,6 +14,7 @@ type Profile struct {
 	Firstname string    `json:"firstname,omitempty"`
 	Lastname  string    `json:"lastname,omitempty"`
 	Avatar    string    `json:"avatar,omitempty"`
+	AvatarURL string    `json:"avatar_url,omitempty"`
 	Title     string    `json:"title,omitempty"`
 	Bio       string    `json:"bio,omitempty"`
 	Faculty   string    `json:"faculty,omitempty"`
@@ -37,8 +38,9 @@ type UserProfile struct {
 	UserType            string    `json:"user_type"`
 	Firstname           string    `json:"firstname,omitempty"`
 	Lastname            string    `json:"lastname,omitempty"`
-	Year				string    `json:"year,omitempty"`
+	Year                string    `json:"year,omitempty"`
 	Avatar              string    `json:"avatar,omitempty"`
+	AvatarURL           string    `json:"avatar_url,omitempty"`
 	Title               string    `json:"title,omitempty"`
 	Bio                 string    `json:"bio,omitempty"`
 	Faculty             string    `json:"faculty,omitempty"`
@@ -55,10 +57,212 @@ type UserProfile struct {
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
+type UserProfileWithIdeas struct {
+	UserProfile *UserProfile `json:"profile"`
+	Ideas       []*Idea      `json:"ideas"`
+}
+
 type ProfileModel struct {
 	DB *sql.DB
 }
 
+func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserProfileWithIdeas, error) {
+	query := `
+        SELECT u.id, u.user_name, u.email, u.user_type, u.created_at,
+               p.firstname, p.lastname, p.avatar, p.title, p.bio, 
+               p.faculty, p.program, p.degree, p.year, p.uni, p.mobile, 
+               p.linkedin, p.github, p.fb, p.updated_at
+        FROM users u
+        LEFT JOIN user_profiles p ON u.id = p.user_id
+        ORDER BY u.created_at DESC
+        LIMIT $1 OFFSET $2`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := m.DB.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var profilesWithIdeas []*UserProfileWithIdeas
+
+	for rows.Next() {
+		var profile UserProfile
+		var firstname, lastname, avatar, title, bio sql.NullString
+		var faculty, program, degree, year, uni, mobile sql.NullString
+		var linkedin, github, fb sql.NullString
+		var updatedAt sql.NullTime
+
+		err := rows.Scan(
+			&profile.ID,
+			&profile.Username,
+			&profile.Email,
+			&profile.UserType,
+			&profile.CreatedAt,
+			&firstname,
+			&lastname,
+			&avatar,
+			&title,
+			&bio,
+			&faculty,
+			&program,
+			&degree,
+			&year,
+			&uni,
+			&mobile,
+			&linkedin,
+			&github,
+			&fb,
+			&updatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Set nullable fields
+		if firstname.Valid {
+			profile.Firstname = firstname.String
+		}
+		if lastname.Valid {
+			profile.Lastname = lastname.String
+		}
+		if avatar.Valid {
+			profile.Avatar = avatar.String
+		}
+		if title.Valid {
+			profile.Title = title.String
+		}
+		if bio.Valid {
+			profile.Bio = bio.String
+		}
+		if faculty.Valid {
+			profile.Faculty = faculty.String
+		}
+		if program.Valid {
+			profile.Program = program.String
+		}
+		if degree.Valid {
+			profile.Degree = degree.String
+		}
+		if year.Valid {
+			profile.Year = year.String
+		}
+		if uni.Valid {
+			profile.Uni = uni.String
+		}
+		if mobile.Valid {
+			profile.Mobile = mobile.String
+		}
+		if linkedin.Valid {
+			profile.LinkedIn = linkedin.String
+		}
+		if github.Valid {
+			profile.GitHub = github.String
+		}
+		if fb.Valid {
+			profile.FB = fb.String
+		}
+		if updatedAt.Valid {
+			profile.UpdatedAt = updatedAt.Time
+		} else {
+			profile.UpdatedAt = profile.CreatedAt
+		}
+
+		if avatar.Valid && avatar.String != "" && avatar.String != "no key" {
+			profile.Avatar = avatar.String
+			profile.AvatarURL = "/v1/avatars/" + avatar.String
+		}
+		// Get skills for the profile
+		skillsQuery := `
+            SELECT skill
+            FROM user_skills
+            WHERE user_id = $1
+        `
+		skillRows, err := m.DB.QueryContext(ctx, skillsQuery, profile.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		var skills []string
+		for skillRows.Next() {
+			var skill string
+			err := skillRows.Scan(&skill)
+			if err != nil {
+				skillRows.Close()
+				return nil, err
+			}
+			skills = append(skills, skill)
+		}
+		skillRows.Close()
+		if err = skillRows.Err(); err != nil {
+			return nil, err
+		}
+
+		profile.Skills = skills
+
+		// Get ideas submitted by the user
+		ideasQuery := `
+            SELECT id, created_at, updated_at, title, description, 
+                  category, tags, upvotes, downvotes, status, version
+            FROM ideas
+            WHERE submitted_by = $1
+            ORDER BY created_at DESC
+        `
+		ideaRows, err := m.DB.QueryContext(ctx, ideasQuery, profile.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Initialize an empty slice for ideas - this ensures that users with no ideas
+		// still have an empty array in the JSON response instead of null
+		ideas := []*Idea{}
+
+		for ideaRows.Next() {
+			var idea Idea
+			var tags []string
+
+			err := ideaRows.Scan(
+				&idea.ID,
+				&idea.CreatedAt,
+				&idea.UpdatedAt,
+				&idea.Title,
+				&idea.Description,
+				&idea.Category,
+				&tags,
+				&idea.Upvotes,
+				&idea.Downvotes,
+				&idea.Status,
+				&idea.Version,
+			)
+			if err != nil {
+				ideaRows.Close()
+				return nil, err
+			}
+
+			idea.Tags = tags
+			idea.SubmittedBy = profile.ID
+			ideas = append(ideas, &idea)
+		}
+		ideaRows.Close()
+		if err = ideaRows.Err(); err != nil {
+			return nil, err
+		}
+
+		// Always add the user to the result, even if they have no ideas
+		profilesWithIdeas = append(profilesWithIdeas, &UserProfileWithIdeas{
+			UserProfile: &profile,
+			Ideas:       ideas,
+		})
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return profilesWithIdeas, nil
+}
 func (m ProfileModel) GetByUserID(userID uuid.UUID) (*Profile, error) {
 	query := `
 		SELECT user_id, firstname, lastname, avatar, title, bio, faculty, 
@@ -236,6 +440,10 @@ func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 		profile.UpdatedAt = profile.CreatedAt
 	}
 
+	if avatar.Valid && avatar.String != "" && avatar.String != "no key" {
+		profile.Avatar = avatar.String
+		profile.AvatarURL = "/v1/avatars/" + avatar.String
+	}
 	// Get skills for the profile
 	query = `
 		SELECT skill
@@ -378,6 +586,11 @@ func (m ProfileModel) GetByUsername(username string) (*UserProfile, error) {
 		profile.UpdatedAt = profile.CreatedAt
 	}
 
+	if avatar.Valid && avatar.String != "" && avatar.String != "no key" {
+		profile.Avatar = avatar.String
+		profile.AvatarURL = "/v1/avatars/" + avatar.String
+	}
+
 	// Get skills for the profile
 	query = `
 		SELECT skill
@@ -431,8 +644,8 @@ func (m ProfileModel) Insert(profile *Profile) error {
 		profile.Bio,
 		profile.Faculty,
 		profile.Program,
-		profile.Year,
 		profile.Degree,
+		profile.Year,
 		profile.Uni,
 		profile.Mobile,
 		profile.LinkedIn,

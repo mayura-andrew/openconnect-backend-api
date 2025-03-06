@@ -12,6 +12,7 @@ type Filters struct {
 	PageSize     int
 	Sort         string
 	SortSafelist []string
+	SubmittedBy  string
 }
 
 type Metadata struct {
