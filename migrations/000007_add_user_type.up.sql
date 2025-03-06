@@ -5,4 +5,4 @@ ALTER TABLE users
     ADD COLUMN user_type TEXT NOT NULL DEFAULT 'normal';
 
 ALTER TABLE users
-    ADD CONSTRAINT valid_user_type CHECK (user_type IN ('normal', 'admin'));
+    ADD CONSTRAINT valid_user_type CHECK (user_type IN ('normal', 'admin', 'google'));
