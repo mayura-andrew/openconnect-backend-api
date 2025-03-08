@@ -247,12 +247,27 @@ func (app *application) getProfileHandler(w http.ResponseWriter, r *http.Request
 	// Get current user from context
 	user := app.contextGetUser(r)
 
+	fmt.Println(user)
+
 	// Get full profile
 	profile, err := app.models.UserProfile.GetFullProfile(user.ID)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w, r)
+			profile = &data.UserProfile{
+				ID:        user.ID,
+				Username:  user.UserName,
+				Email:     user.Email,
+				UserType:  user.UserType,
+				CreatedAt: user.CreatedAt,
+			}
+
+			// Return an empty profile with basic user information
+			err = app.writeJSON(w, http.StatusOK, envelope{"profile": profile}, nil)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+			}
+			return // No profile found, return empty profile
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -260,7 +275,7 @@ func (app *application) getProfileHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	response := map[string]interface{}{
-		"profile": profile,
+		"profile":           profile,
 		"hasProfileCreated": user.HasProfileCreated,
 	}
 
