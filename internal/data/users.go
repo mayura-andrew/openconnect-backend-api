@@ -19,14 +19,15 @@ var (
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UserName  string    `json:"username"`
-	Email     string    `json:"email"`
-	Password  password  `json:"-"`
-	UserType  string    `json:"user_type"`
-	Activated bool      `json:"activated"`
-	Version   int       `json:"version"`
+	ID                uuid.UUID `json:"id"`
+	CreatedAt         time.Time `json:"created_at"`
+	UserName          string    `json:"username"`
+	Email             string    `json:"email"`
+	Password          password  `json:"-"`
+	UserType          string    `json:"user_type"`
+	Activated         bool      `json:"activated"`
+	HasProfileCreated bool      `json:"has_profile_created"`
+	Version           int       `json:"version"`
 }
 
 type password struct {
@@ -91,11 +92,11 @@ type UserModal struct {
 }
 
 func (m UserModal) Insert(user *User) error {
-	query := `INSERT INTO users (user_name, email, password_hash, user_type, activated) 
-			VALUES ($1, $2, $3, $4, $5) 
+	query := `INSERT INTO users (user_name, email, password_hash, user_type, activated, has_profile_created) 
+			VALUES ($1, $2, $3, $4, $5, $6) 
 			RETURNING id, created_at, version`
 
-	args := []any{user.UserName, user.Email, user.Password.hash, user.UserType, user.Activated}
+	args := []any{user.UserName, user.Email, user.Password.hash, user.UserType, user.Activated, user.HasProfileCreated}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -113,7 +114,7 @@ func (m UserModal) Insert(user *User) error {
 }
 
 func (m UserModal) GetByEmail(email string) (*User, error) {
-	query := `SELECT id, created_at, user_name, email, password_hash, user_type, activated, version
+	query := `SELECT id, created_at, user_name, email, password_hash, user_type, activated, has_profile_created, version
       		  FROM users
       		  WHERE email = $1`
 
@@ -130,6 +131,7 @@ func (m UserModal) GetByEmail(email string) (*User, error) {
 		&user.Password.hash,
 		&user.UserType,
 		&user.Activated,
+		&user.HasProfileCreated,
 		&user.Version)
 
 	if err != nil {
@@ -145,8 +147,8 @@ func (m UserModal) GetByEmail(email string) (*User, error) {
 
 func (m UserModal) Update(user *User) error {
 	query := `UPDATE users
-			SET user_name = $1, email = $2, password_hash = $3, activated = $4, version = version + 1
-			WHERE id = $5 AND version = $6
+			SET user_name = $1, email = $2, password_hash = $3, activated = $4, has_profile_created= $5, version = version + 1
+			WHERE id = $6 AND version = $7
 			RETURNING version`
 
 	args := []any{
@@ -154,6 +156,7 @@ func (m UserModal) Update(user *User) error {
 		user.Email,
 		user.Password.hash,
 		user.Activated,
+		user.HasProfileCreated,
 		user.ID,
 		user.Version,
 	}
@@ -178,7 +181,7 @@ func (m UserModal) Update(user *User) error {
 func (m UserModal) GetForToken(tokenScope, tokenPlainText string) (*User, error) {
 	tokenHash := sha256.Sum256([]byte(tokenPlainText))
 
-	query := `SELECT users.id, users.created_at, users.user_name, users.email, users.password_hash, users.user_type, users.activated, users.version
+	query := `SELECT users.id, users.created_at, users.user_name, users.email, users.password_hash, users.user_type, users.activated, users.has_profile_created, users.version
 	FROM users
 	INNER JOIN tokens
 	ON users.id = tokens.user_id
@@ -202,6 +205,7 @@ func (m UserModal) GetForToken(tokenScope, tokenPlainText string) (*User, error)
 		&user.Password.hash,
 		&user.UserType,
 		&user.Activated,
+		&user.HasProfileCreated,
 		&user.Version,
 	)
 	if err != nil {
@@ -237,7 +241,6 @@ func (m UserModal) FindOrCreateFromGoogle(googleUser *GoogleUser) (*User, error)
 		return user, nil
 	}
 
-	
 	// If user doesn't exist, create new one
 	if errors.Is(err, ErrRecordNotFound) {
 		user = &User{

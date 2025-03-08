@@ -11,10 +11,9 @@ import (
 )
 
 func (app *application) createProfileHandler(w http.ResponseWriter, r *http.Request) {
-	// Get current user from context
+
 	user := app.contextGetUser(r)
 
-	// Check if profile already exists
 	_, err := app.models.UserProfile.GetByUserID(user.ID)
 	if err == nil {
 		app.failedValidationResponse(w, r, map[string]string{"profile": "profile already exists for this user"})
@@ -24,7 +23,6 @@ func (app *application) createProfileHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Parse the request body
 	var input struct {
 		Firstname string   `json:"firstname"`
 		Lastname  string   `json:"lastname"`
@@ -43,8 +41,6 @@ func (app *application) createProfileHandler(w http.ResponseWriter, r *http.Requ
 		Skills    []string `json:"skills"`
 	}
 
-	fmt.Println("Request Body:", r.Body)
-
 	err = app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
@@ -56,9 +52,6 @@ func (app *application) createProfileHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	fmt.Println("Avatar ID:", avatarID)
-
-	// Create a new profile
 	profile := &data.Profile{
 		UserID:    user.ID,
 		Firstname: input.Firstname,
@@ -90,6 +83,18 @@ func (app *application) createProfileHandler(w http.ResponseWriter, r *http.Requ
 	err = app.models.UserProfile.Insert(profile)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	user.HasProfileCreated = true
+	err = app.models.Users.Update(user)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
@@ -256,15 +261,7 @@ func (app *application) getProfileHandler(w http.ResponseWriter, r *http.Request
 
 	response := map[string]interface{}{
 		"profile": profile,
-	}
-
-	if profile.Avatar != "" && profile.Avatar != "no key" {
-		avatarBase64, err := app.getAvatarBase64(profile.Avatar)
-		if err != nil {
-			app.logger.PrintError(err, nil)
-		} else if avatarBase64 != "" {
-			response["avatarBase64"] = avatarBase64
-		}
+		"hasProfileCreated": user.HasProfileCreated,
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"profile": response}, nil)
@@ -296,30 +293,30 @@ func (app *application) getProfileByUsernameHandler(w http.ResponseWriter, r *ht
 }
 
 func (app *application) listProfilesWithIdeasHandler(w http.ResponseWriter, r *http.Request) {
-    // Get query parameters
-    qs := r.URL.Query()
+	// Get query parameters
+	qs := r.URL.Query()
 
-    v := validator.New()
-    limit := app.readInt(qs, "limit", 20, v)
-    offset := app.readInt(qs, "offset", 0, v)
+	v := validator.New()
+	limit := app.readInt(qs, "limit", 20, v)
+	offset := app.readInt(qs, "offset", 0, v)
 
-    if !v.Valid() {
-        app.failedValidationResponse(w, r, v.Errors)
-        return
-    }
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
 
-    // Get all profiles with ideas
-    profilesWithIdeas, err := app.models.UserProfile.GetAllProfilesWithIdeas(limit, offset)
-    if err != nil {
-        app.serverErrorResponse(w, r, err)
-        return
-    }
+	// Get all profiles with ideas
+	profilesWithIdeas, err := app.models.UserProfile.GetAllProfilesWithIdeas(limit, offset)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
 
-    // Return the profiles with ideas
-    err = app.writeJSON(w, http.StatusOK, envelope{"profiles": profilesWithIdeas, "count": len(profilesWithIdeas)}, nil)
-    if err != nil {
-        app.serverErrorResponse(w, r, err)
-    }
+	// Return the profiles with ideas
+	err = app.writeJSON(w, http.StatusOK, envelope{"profiles": profilesWithIdeas, "count": len(profilesWithIdeas)}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
 
 func (app *application) searchProfilesHandler(w http.ResponseWriter, r *http.Request) {
@@ -353,7 +350,6 @@ func (app *application) searchProfilesHandler(w http.ResponseWriter, r *http.Req
 // Helper function to validate profile data
 func validateProfile(v *validator.Validator, profile *data.Profile) {
 	v.Check(profile.UserID != uuid.Nil, "user_id", "must be provided")
-
 
 	if profile.Firstname != "" {
 		v.Check(len(profile.Firstname) <= 100, "firstname", "must not exceed 100 characters")

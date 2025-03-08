@@ -69,11 +69,13 @@ type ProfileModel struct {
 func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserProfileWithIdeas, error) {
 	query := `
         SELECT u.id, u.user_name, u.email, u.user_type, u.created_at,
+		u.has_profile_created,
                p.firstname, p.lastname, p.avatar, p.title, p.bio, 
                p.faculty, p.program, p.degree, p.year, p.uni, p.mobile, 
                p.linkedin, p.github, p.fb, p.updated_at
         FROM users u
         LEFT JOIN user_profiles p ON u.id = p.user_id
+		WHERE u.has_profile_created = true
         ORDER BY u.created_at DESC
         LIMIT $1 OFFSET $2`
 
@@ -90,6 +92,7 @@ func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserPro
 
 	for rows.Next() {
 		var profile UserProfile
+		var hasProfileCreated bool
 		var firstname, lastname, avatar, title, bio sql.NullString
 		var faculty, program, degree, year, uni, mobile sql.NullString
 		var linkedin, github, fb sql.NullString
@@ -101,6 +104,7 @@ func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserPro
 			&profile.Email,
 			&profile.UserType,
 			&profile.CreatedAt,
+			&hasProfileCreated,
 			&firstname,
 			&lastname,
 			&avatar,
@@ -169,6 +173,8 @@ func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserPro
 		} else {
 			profile.UpdatedAt = profile.CreatedAt
 		}
+
+		profile.HasCompletedProfile = hasProfileCreated
 
 		if avatar.Valid && avatar.String != "" && avatar.String != "no key" {
 			profile.Avatar = avatar.String
@@ -342,15 +348,16 @@ func (m ProfileModel) GetByUserID(userID uuid.UUID) (*Profile, error) {
 
 func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 	query := `
-		SELECT u.id, u.user_name, u.email, u.user_type, u.created_at,
+		SELECT u.id, u.user_name, u.email, u.user_type, u.created_at, u.has_profile_created,
 		       p.firstname, p.lastname, p.avatar, p.title, p.bio, 
 		       p.faculty, p.program, p.degree, p.year, p.uni, p.mobile, 
 		       p.linkedin, p.github, p.fb, p.updated_at
 		FROM users u
 		LEFT JOIN user_profiles p ON u.id = p.user_id
-		WHERE u.id = $1`
+		WHERE u.has_profile_created = true AND u.id = $1`
 
 	var profile UserProfile
+	var hasProfileCreated bool
 	var firstname, lastname, avatar, title, bio sql.NullString
 	var faculty, program, degree, year, uni, mobile sql.NullString
 	var linkedin, github, fb sql.NullString
@@ -365,6 +372,7 @@ func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 		&profile.Email,
 		&profile.UserType,
 		&profile.CreatedAt,
+		&hasProfileCreated,
 		&firstname,
 		&lastname,
 		&avatar,
@@ -391,6 +399,7 @@ func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 		}
 	}
 
+	profile.HasCompletedProfile = hasProfileCreated
 	// Set nullable fields
 	if firstname.Valid {
 		profile.Firstname = firstname.String

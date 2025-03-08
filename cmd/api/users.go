@@ -37,6 +37,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		Email:     input.Email,
 		UserType:  "normal",
 		Activated: false,
+		HasProfileCreated: false,
 	}
 
 	err = user.Password.Set(input.Password)
