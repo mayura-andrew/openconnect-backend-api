@@ -48,6 +48,20 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 		userID = user.ID
 	}
 
+	
+	// Get existing profile
+	profile, err := app.models.UserProfile.GetByUserID(user.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+	fmt.Println("Profile ID:", profile)
+
 	pdfID, err := app.processAndSavePDF(input.PDF, w, r)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
