@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/julienschmidt/httprouter"
 	"net/http"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 func (app *application) routes() http.Handler {
@@ -27,6 +28,21 @@ func (app *application) routes() http.Handler {
 
 	router.HandlerFunc(http.MethodGet, "/v1/auth/google/login", app.googleLoginHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/auth/google/callback", app.googleCallbackHandler)
+
+	router.HandlerFunc(http.MethodGet, "/v1/profile", app.getProfileHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/profiles/search", app.searchProfilesHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/profile/new", app.requirePermission("ideas:write", app.createProfileHandler))
+	router.HandlerFunc(http.MethodPatch, "/v1/profile/update", app.requirePermission("ideas:write", app.updateProfileHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/profile/delete", app.requirePermission("ideas:write", app.deleteProfileHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/profiles-with-ideas", app.listProfilesWithIdeasHandler)
+
+	router.HandlerFunc(http.MethodGet, "/v1/files/:type/:id", app.serveFilesHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/avatars/:id", app.serveAvatarHandler) // Direct avatar access
+	router.HandlerFunc(http.MethodGet, "/v1/pdfs/:id", app.servePDFHandler)       // Direct PDF access
+
+	//router.HandlerFunc(http.MethodGet, "/v1/profiles/:username", app.requirePermission("ideas:read", app.getProfileByUsernameHandler))
+
+	router.HandlerFunc(http.MethodGet, "/v1/profiles/id/:userId",  app.getProfileWithIdeasByUserIDHandler)
 	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
 
 }

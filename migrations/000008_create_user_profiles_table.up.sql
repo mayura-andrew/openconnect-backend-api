@@ -1,0 +1,26 @@
+CREATE TABLE user_profiles (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    firstname TEXT DEFAULT NULL,
+    lastname TEXT DEFAULT NULL,
+    avatar TEXT DEFAULT NULL,
+    title TEXT DEFAULT NULL,
+    bio TEXT DEFAULT NULL,
+    faculty TEXT DEFAULT NULL,
+    program TEXT DEFAULT NULL,
+    degree TEXT DEFAULT NULL,
+    year TEXT DEFAULT NULL,
+    uni TEXT DEFAULT NULL,
+    mobile TEXT DEFAULT NULL,
+    linkedin TEXT DEFAULT NULL,
+    github TEXT DEFAULT NULL,
+    fb TEXT DEFAULT NULL,
+    created_at TIMESTAMP(0) WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP(0) WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE user_skills (
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    skill TEXT NOT NULL,
+    UNIQUE (user_id, skill)
+);

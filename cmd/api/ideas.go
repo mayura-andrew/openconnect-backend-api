@@ -12,12 +12,16 @@ import (
 
 func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Title       string   `json:"title"`
-		Description string   `json:"description"`
-		PDFBase64   string   `json:"pdfBase64"`
-		Category    string   `json:"category"`
-		Tags        []string `json:"tags"`
-		SubmittedBy string   `json:"submitted_by"`
+		Title            string   `json:"title"`
+		Description      string   `json:"description"`
+		PDF              string   `json:"pdf"`
+		Category         string   `json:"category"`
+		Tags             []string `json:"tags"`
+		UserID           string   `json:"user_id"`
+		LearningOutcome  string   `json:"learning_outcome"`
+		RecommendedLevel string   `json:"recommended_level"`
+		GitHubLink       string   `json:"github_link"`
+		WebsiteLink      string   `json:"website_link"`
 	}
 
 	err := app.readJSON(w, r, &input)
@@ -26,32 +30,55 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Validate the input data
+	user := app.contextGetUser(r)
 
-	if len(input.SubmittedBy) != 36 {
-		app.badRequestResponse(w, r, fmt.Errorf("submitted_by must be a valid UUID of length 36"))
-		return
+	var userID uuid.UUID
+
+	if input.UserID != "" {
+		if len(input.UserID) != 36 {
+			app.badRequestResponse(w, r, fmt.Errorf("user_id must be a valid UUID of length 36"))
+			return
+		}
+		userID, err = uuid.Parse(input.UserID)
+		if err != nil {
+			app.badRequestResponse(w, r, fmt.Errorf("user_id must be a valid UUID"))
+			return
+		}
+	} else {
+		userID = user.ID
 	}
 
-	submittedBy, err := uuid.Parse(input.SubmittedBy)
+	
+	// Get existing profile
+	profile, err := app.models.UserProfile.GetByUserID(user.ID)
 	if err != nil {
-		app.badRequestResponse(w, r, fmt.Errorf("submitted_by must be a valid UUID"))
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
+	fmt.Println("Profile ID:", profile)
 
-	uniqueID, err := app.processAndSavePDF(input.PDFBase64, w, r)
+	pdfID, err := app.processAndSavePDF(input.PDF, w, r)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	idea := &data.Idea{
-		Title:       input.Title,
-		Description: input.Description,
-		Pdf:         uniqueID,
-		Category:    input.Category,
-		Tags:        input.Tags,
-		SubmittedBy: submittedBy,
+		Title:            input.Title,
+		Description:      input.Description,
+		Category:         input.Category,
+		Tags:             input.Tags,
+		UserID:           userID,
+		IdeaSourceID:     pdfID,
+		LearningOutcome:  input.LearningOutcome,
+		RecommendedLevel: input.RecommendedLevel,
+		GitHubLink:       input.GitHubLink,
+		WebsiteLink:      input.WebsiteLink,
 	}
 
 	v := validator.New()
@@ -69,8 +96,6 @@ func (app *application) createIdeaHandler(w http.ResponseWriter, r *http.Request
 
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/ideas/%d", idea.ID))
-	// Save the idea to the database or perform other necessary operations
-	// 	// ...
 
 	err = app.writeJSON(w, http.StatusCreated, envelope{"idea": idea}, headers)
 
@@ -233,11 +258,16 @@ func (app *application) updateIdeaHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	var input struct {
-		Title       *string  `json:"title"`
-		Description *string  `json:"description"`
-		Category    *string  `json:"category"`
-		Tags        []string `json:"tags"`
-		PdfBase64   *string  `json:"pdfBase64"`
+		Title            *string  `json:"title"`
+		Description      *string  `json:"description"`
+		Category         *string  `json:"category"`
+		Tags             []string `json:"tags"`
+		PdfBase64        *string  `json:"pdfBase64"`
+		LearningOutcome  *string  `json:"learning_outcome"`
+		RecommendedLevel *string  `json:"recommended_level"`
+		GitHubLink       *string  `json:"github_link"`
+		WebsiteLink      *string  `json:"website_link"`
+		Status           *string  `json:"status"`
 	}
 
 	err = app.readJSON(w, r, &input)

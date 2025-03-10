@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/OpenConnectOUSL/backend-api-v1/internal/data"
+
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/utils"
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
 	"github.com/google/uuid"
@@ -54,7 +56,7 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 
-	maxBytes := 1_048_576 * 5 // 1MB
+	maxBytes := 1_048_576 * 10 // 1MB
 	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -147,6 +149,119 @@ func (app *application) processAndSavePDF(inputBase64 string, w http.ResponseWri
 	return unique, nil
 }
 
+func (app *application) processAndSaveAvatar(inputBase64 string, w http.ResponseWriter, r *http.Request) (string, error) {
+	if inputBase64 == "" {
+		return "no key", nil
+	}
+
+	imgData, err := base64.StdEncoding.DecodeString(inputBase64)
+
+	fmt.Println("imgData", imgData)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return "", fmt.Errorf("invalid image file", err)
+	}
+
+	if len(imgData) < 8 {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid image file"))
+		return "", err
+	}
+
+	isJPEG := bytes.HasPrefix(imgData, []byte{0xFF, 0xD8, 0xFF})
+	isPNG := bytes.HasPrefix(imgData, []byte{0x89, 0x50, 0x4E, 0x47})
+	isGIF := bytes.HasPrefix(imgData, []byte{0x47, 0x49, 0x46, 0x38})
+
+	if !isJPEG && !isPNG && !isGIF {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid image file"))
+		return "", fmt.Errorf("unsupported image format", err)
+	}
+
+	const maxImageSize = 5 * 1024 * 1024 // 5MB
+	if len(imgData) > maxImageSize {
+		app.badRequestResponse(w, r, fmt.Errorf("image file size must be less than 5MB"))
+		return "", fmt.Errorf("image too large", err)
+	}
+
+	// save the image to a file
+
+	uploadsDir := "../../uploads/avatars"
+	if _, err := os.Stat(uploadsDir); os.IsNotExist(err) {
+		err = os.MkdirAll(uploadsDir, 0755)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return "", err
+		}
+	}
+
+	unique := utils.GenerateUUID()
+
+	var extension string
+
+	if isJPEG {
+		extension = ".jpg"
+	} else if isPNG {
+		extension = ".png"
+	} else if isGIF {
+		extension = ".gif"
+	}
+
+	filenameWithId := unique + extension
+	avatarPath := filepath.Join(uploadsDir, filenameWithId)
+
+	fmt.Println("avatarPath", avatarPath)
+
+	err = os.WriteFile(avatarPath, imgData, 0644)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return "", err
+	}
+
+	return unique, nil
+}
+
+func (app *application) getAvatarBase64(avatarID string) (string, error) {
+	if avatarID == "" || avatarID == "no key" {
+		return "", nil
+	}
+	extensions := []string{".jpg", ".png", ".gif"}
+	var found bool
+	var filePath string
+
+	for _, ext := range extensions {
+		filePath = filepath.Join("../../uploads/avatars", avatarID+ext)
+		if _, err := os.Stat(filePath); err == nil {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return "", fmt.Errorf("avatar file not found for ID: %s", avatarID)
+	}
+
+	fileData, err := os.ReadFile(filePath)
+
+	if err != nil {
+		return "", err
+	}
+
+	var contentType string
+	switch filepath.Ext(filePath) {
+	case ".jpg":
+		contentType = "image/jpeg"
+	case ".png":
+		contentType = "image/png"
+	case ".gif":
+		contentType = "image/gif"
+	default:
+		contentType = "application/octet-stream"
+	}
+
+	avatarBase64 := "data:" + contentType + ";base64," + base64.StdEncoding.EncodeToString(fileData)
+
+	return avatarBase64, nil
+}
+
 func (app *application) readString(qs url.Values, key string, defaultValue string) string {
 	s := qs.Get(key)
 
@@ -193,4 +308,31 @@ func (app *application) background(fn func()) {
 		}()
 		fn()
 	}()
+}
+
+func (app *application) validateProfile(v *validator.Validator, profile *data.Profile) {
+	v.Check(profile.UserID != uuid.Nil, "user_id", "must be provided")
+
+	// Optional validations for specific fields
+	if profile.Title != "" {
+		v.Check(len(profile.Title) <= 100, "title", "must not be more than 100 bytes long")
+	}
+
+	if profile.Bio != "" {
+		v.Check(len(profile.Bio) <= 1000, "bio", "must not be more than 1000 bytes long")
+	}
+
+	// Validate skills if provided
+	if profile.Skills != nil {
+		v.Check(len(profile.Skills) <= 20, "skills", "must not contain more than 20 skills")
+
+		for i, skill := range profile.Skills {
+			v.Check(len(skill) <= 50, fmt.Sprintf("skills[%d]", i), "must not be more than 50 bytes long")
+		}
+	}
+}
+
+func (app *application) readStringParam(r *http.Request, paramName string) string {
+	params := httprouter.ParamsFromContext(r.Context())
+	return params.ByName(paramName)
 }

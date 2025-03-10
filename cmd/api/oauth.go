@@ -114,6 +114,15 @@ func (app *application) googleCallbackHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	err = app.models.Permissions.AddForUser(user.ID, "ideas:write")
+
+	fmt.Println("User ID: ", user.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+
 	// Generate authentication token
 	authToken, err := app.models.Tokens.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
 	if err != nil {

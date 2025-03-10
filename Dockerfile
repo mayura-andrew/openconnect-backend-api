@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install migrate
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
@@ -32,6 +32,7 @@ COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY --from=builder /app/main .
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/internal/mailer/templates ./internal/mailer/templates
+COPY --from=builder /app/uploads ./uploads
 
 # Environment variables
 ENV DB_DSN=${DB_DSN}
