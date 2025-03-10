@@ -437,3 +437,64 @@ func (app *application) getCurrentUserProfileHandler(w http.ResponseWriter, r *h
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) getProfileWithIdeasByUserIDHandler(w http.ResponseWriter, r *http.Request) {
+
+	userIdParam := app.readStringParam(r, "userId")
+
+	userID, err := uuid.Parse(userIdParam)
+	if err != nil {
+        app.badRequestResponse(w, r, fmt.Errorf("invalid user ID: %s", err.Error()))
+		return
+	}
+
+	profile, err := app.models.UserProfile.GetFullProfile(userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	qs := r.URL.Query()
+	v := validator.New()
+	limit := app.readInt(qs, "limit", 10, v)
+	offset := app.readInt(qs, "offset", 0, v)
+
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	ideas, totalCount, err := app.models.Ideas.GetAllByUserID(userID, limit, offset)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	response := map[string]interface{}{
+		"profile": profile,
+		"ideas": ideas,
+		"ideas_count": totalCount,
+		"limit": limit,
+		"offset": offset,
+	}	
+
+	if profile.Avatar != "" && profile.Avatar != "no key" {
+        response["avatarURL"] = fmt.Sprintf("/v1/avatars/%s", profile.Avatar)
+    }
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"response": response}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+
+}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/OpenConnectOUSL/backend-api-v1/internal/validator"
@@ -13,21 +14,22 @@ import (
 )
 
 type Idea struct {
-	ID              uuid.UUID   `json:"id"` // Unique identifier for the idea
-	CreatedAt       time.Time   `json:"created_at"`
-	Title           string      `json:"title"`            // Title of the idea
-	Description     string      `json:"description"`      // Detailed description of the idea
-	Category        string      `json:"category"`         // Category of the idea
-	Pdf             string      `json:"pdf"`              // PDF file of the idea
-	Tags            []string    `json:"tags"`             // List of tags associated with the idea
-	SubmittedBy     uuid.UUID   `json:"submitted_by"`     // User ID of the person who submitted the idea
-	UpdatedAt       time.Time   `json:"updated_at"`       // Timestamp of when the idea was submitted
-	Upvotes         int         `json:"upvotes"`          // Number of upvotes received
-	Downvotes       int         `json:"downvotes"`        // Number of downvotes received
-	Status          string      `json:"status"`           // Current status of the idea (e.g., pending, approved, rejected)
-	Comments        []uuid.UUID `json:"comments"`         // List of comments on the idea
-	InterestedUsers []uuid.UUID `json:"interested_users"` // List of user IDs who are interested in the idea
-	Version         int32       `json:"version"`
+	ID               uuid.UUID `json:"id"`
+	Title            string    `json:"title"`
+	Description      string    `json:"description"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	UserID           uuid.UUID `json:"user_id"`
+	IdeaSourceID     string `json:"idea_source_id,omitempty"`
+	Pdf              string    `json:"pdf"`
+	Category         string    `json:"category"`
+	Tags             []string  `json:"tags"`
+	Status           string    `json:"status"`
+	LearningOutcome  string    `json:"learning_outcome,omitempty"`
+	RecommendedLevel string    `json:"recommended_level,omitempty"`
+	GitHubLink       string    `json:"github_link,omitempty"`
+	WebsiteLink      string    `json:"website_link,omitempty"`
+	Version          int       `json:"version"`
 }
 
 type Comment struct {
@@ -45,8 +47,8 @@ func ValidateIdea(v *validator.Validator, idea *Idea) {
 	v.Check(idea.Description != "", "description", "must be provided")
 	v.Check(len(idea.Description) <= 1000, "description", "must not be more than 1000 bytes long")
 
-	v.Check(idea.Pdf != "", "pdf", "must be provided")
-	v.Check(len(idea.Pdf) > 0, "pdf", "must not be empty")
+	// v.Check(idea.Pdf != "", "pdf", "must be provided")
+	// v.Check(len(idea.Pdf) > 0, "pdf", "must not be empty")
 
 	// isPDF := strings.EqualFold(filepath.Ext(idea.Pdf), ".pdf")
 
@@ -69,9 +71,25 @@ func ValidateIdea(v *validator.Validator, idea *Idea) {
 
 	// v.Check(idea.SubmittedBy != 0, "submitted_by", "must be provided")
 	// v.Check(idea.SubmittedBy > 0, "submitted_by", "must be a positive integer")
-	if !ValidateUUID(idea.SubmittedBy.String()) {
-		v.AddError("submitted_by", "must be a valid UUID")
+	if !ValidateUUID(idea.UserID.String()) {
+		v.AddError("user_id", "must be a valid UUID")
 	}
+// if !ValidateUUID(idea.IdeaSourceID.String()) {
+// 		v.AddError("idea_source_id", "must be a valid UUID")
+// 	}
+	
+
+	if idea.GitHubLink != "" {
+		v.Check(IsValidURL(idea.GitHubLink), "github_link", "must be a valid URL")
+	}
+	if idea.WebsiteLink != "" {
+		v.Check(IsValidURL(idea.WebsiteLink), "website_link", "must be a valid URL")
+	}
+
+}
+
+func IsValidURL(str string) bool {
+	return len(str) > 0 && (strings.HasPrefix(str, "http://") || strings.HasPrefix(str, "https://"))
 }
 
 func ValidateUUID(uuidStr string) bool {
@@ -84,29 +102,55 @@ type IdeaModel struct {
 }
 
 func (i IdeaModel) Insert(idea *Idea) error {
-	query := `INSERT INTO ideas (title, description, submitted_by, idea_source_id, category, tags)
-    VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, version`
 
-	args := []any{idea.Title, idea.Description, idea.SubmittedBy, idea.Pdf, idea.Category, pq.Array(idea.Tags)}
+	Status := "pending"
+	
+	query := `INSERT INTO ideas (title, description, user_id, idea_source_id, category, tags,
+	learning_outcome, recommended_level, github_link, website_link, status)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+	RETURNING id, created_at, updated_at, version`
+
+	args := []any{
+		idea.Title,
+		idea.Description,
+		idea.UserID,
+		idea.IdeaSourceID,
+		idea.Category,
+		pq.Array(idea.Tags),
+		idea.LearningOutcome,
+		idea.RecommendedLevel,
+		idea.GitHubLink,
+		idea.WebsiteLink,
+		Status,
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	return i.DB.QueryRowContext(ctx, query, args...).Scan(&idea.ID, &idea.CreatedAt, &idea.Version)
+	return i.DB.QueryRowContext(ctx, query, args...).Scan(&idea.ID, &idea.CreatedAt, &idea.UpdatedAt, &idea.Version)
 
 }
 
 func (i IdeaModel) Update(idea *Idea) error {
 	query := `UPDATE ideas 
-	SET title = $1, description = $2, submitted_by = $3, idea_source_id = $4, category = $5, tags = $6, version = version + 1 WHERE id = $7 AND version = $8 RETURNING version`
+              SET title = $1, description = $2, user_id = $3, idea_source_id = $4, 
+                  category = $5, tags = $6, learning_outcome = $7, recommended_level = $8,
+                  github_link = $9, website_link = $10, status = $11, version = version + 1 
+              WHERE id = $12 AND version = $13 
+              RETURNING version`
 
 	args := []any{
 		idea.Title,
 		idea.Description,
-		idea.SubmittedBy,
-		idea.Pdf,
+		idea.UserID,
+		idea.IdeaSourceID,
 		idea.Category,
 		pq.Array(idea.Tags),
+		idea.LearningOutcome,
+		idea.RecommendedLevel,
+		idea.GitHubLink,
+		idea.WebsiteLink,
+		idea.Status,
 		idea.ID,
 		idea.Version,
 	}
@@ -127,9 +171,11 @@ func (i IdeaModel) Update(idea *Idea) error {
 }
 
 func (i IdeaModel) Get(id uuid.UUID) (*Idea, error) {
-	// id should be a valid UUID
-
-	query := `SELECT id, created_at, updated_at, title, description, submitted_by, idea_source_id, category, tags, upvotes, downvotes, status, comments,  interested_users, version FROM ideas WHERE id = $1`
+	query := `SELECT id, created_at, updated_at, title, description, user_id, idea_source_id, 
+                    category, tags, status, learning_outcome, recommended_level, github_link, 
+                    website_link, version 
+             FROM ideas 
+             WHERE id = $1`
 
 	var idea Idea
 
@@ -142,15 +188,15 @@ func (i IdeaModel) Get(id uuid.UUID) (*Idea, error) {
 		&idea.UpdatedAt,
 		&idea.Title,
 		&idea.Description,
-		&idea.SubmittedBy,
-		&idea.Pdf,
+		&idea.UserID,
+		&idea.IdeaSourceID,
 		&idea.Category,
 		pq.Array(&idea.Tags),
-		&idea.Upvotes,
-		&idea.Downvotes,
 		&idea.Status,
-		pq.Array(&idea.Comments),
-		pq.Array(&idea.InterestedUsers),
+		&idea.LearningOutcome,
+		&idea.RecommendedLevel,
+		&idea.GitHubLink,
+		&idea.WebsiteLink,
 		&idea.Version,
 	)
 
@@ -191,12 +237,15 @@ func (i IdeaModel) Delete(id uuid.UUID) error {
 }
 
 func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters) ([]*Idea, Metadata, error) {
-	query := fmt.Sprintf(`SELECT count(*) OVER(), id, created_at, updated_at, title, description, submitted_by, idea_source_id, category, tags, upvotes, downvotes, status, comments, interested_users, version
-	FROM ideas 
-	WHERE (to_tsvector('english', title) @@ plainto_tsquery('english', $1) OR $1 = '') 
-	AND (tags @> $2 OR $2 = '{}') 
-	ORDER BY %s %s, id ASC
-	LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
+	query := fmt.Sprintf(`SELECT count(*) OVER(), id, created_at, updated_at, title, description, 
+                                user_id, idea_source_id, category, tags, status, learning_outcome, 
+                                recommended_level, github_link, website_link, version
+                          FROM ideas 
+                          WHERE (to_tsvector('english', title) @@ plainto_tsquery('english', $1) OR $1 = '') 
+                          AND (tags @> $2 OR $2 = '{}') 
+                          ORDER BY %s %s, id ASC
+                          LIMIT $3 OFFSET $4`,
+		filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -222,15 +271,15 @@ func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters) ([]
 			&idea.UpdatedAt,
 			&idea.Title,
 			&idea.Description,
-			&idea.SubmittedBy,
-			&idea.Pdf,
+			&idea.UserID,
+			&idea.IdeaSourceID,
 			&idea.Category,
 			pq.Array(&idea.Tags),
-			&idea.Upvotes,
-			&idea.Downvotes,
 			&idea.Status,
-			pq.Array(&idea.Comments),
-			pq.Array(&idea.InterestedUsers),
+			&idea.LearningOutcome,
+			&idea.RecommendedLevel,
+			&idea.GitHubLink,
+			&idea.WebsiteLink,
 			&idea.Version,
 		)
 
@@ -249,4 +298,77 @@ func (i IdeaModel) GetAllIdeas(title string, tags []string, filters Filters) ([]
 	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
 
 	return ideas, metadata, nil
+}
+
+func (i IdeaModel) GetAllByUserID(userID uuid.UUID, limit, offset int) ([]*Idea, int, error) {
+	// Query to get total count
+	countQuery := `
+        SELECT COUNT(*) 
+        FROM ideas 
+        WHERE user_id = $1`
+
+	// Main query with pagination
+	query := `
+        SELECT id, created_at, updated_at, title, description, user_id, idea_source_id, 
+               category, tags, status, learning_outcome, recommended_level, github_link,
+               website_link, version
+        FROM ideas
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var totalCount int
+	err := i.DB.QueryRowContext(ctx, countQuery, userID).Scan(&totalCount)
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := i.DB.QueryContext(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer rows.Close()
+
+	var ideas []*Idea
+
+	for rows.Next() {
+		var idea Idea
+
+		err := rows.Scan(
+			&idea.ID,
+			&idea.CreatedAt,
+			&idea.UpdatedAt,
+			&idea.Title,
+			&idea.Description,
+			&idea.UserID,
+			&idea.IdeaSourceID,
+			&idea.Category,
+			pq.Array(&idea.Tags),
+			&idea.Status,
+			&idea.LearningOutcome,
+			&idea.RecommendedLevel,
+			&idea.GitHubLink,
+			&idea.WebsiteLink,
+			&idea.Version,
+		)
+
+		if err != nil {
+			return nil, 0, err
+		}
+
+		ideas = append(ideas, &idea)
+
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return ideas, totalCount, nil
+
 }

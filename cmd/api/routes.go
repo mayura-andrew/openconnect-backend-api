@@ -41,6 +41,8 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/pdfs/:id", app.servePDFHandler)       // Direct PDF access
 
 	//router.HandlerFunc(http.MethodGet, "/v1/profiles/:username", app.requirePermission("ideas:read", app.getProfileByUsernameHandler))
+
+	router.HandlerFunc(http.MethodGet, "/v1/profiles/id/:userId", app.requirePermission("ideas:read", app.getProfileWithIdeasByUserIDHandler))
 	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
 
 }

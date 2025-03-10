@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type Profile struct {
@@ -210,12 +211,13 @@ func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserPro
 
 		// Get ideas submitted by the user
 		ideasQuery := `
-            SELECT id, created_at, updated_at, title, description, 
-                  category, tags, upvotes, downvotes, status, version
-            FROM ideas
-            WHERE submitted_by = $1
-            ORDER BY created_at DESC
-        `
+    SELECT id, created_at, updated_at, title, description, user_id, idea_source_id,
+           category, tags, status, learning_outcome, recommended_level, github_link,
+           website_link, version
+    FROM ideas
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+`
 		ideaRows, err := m.DB.QueryContext(ctx, ideasQuery, profile.ID)
 		if err != nil {
 			return nil, err
@@ -235,11 +237,15 @@ func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserPro
 				&idea.UpdatedAt,
 				&idea.Title,
 				&idea.Description,
+				&idea.UserID,
+				&idea.IdeaSourceID,
 				&idea.Category,
-				&tags,
-				&idea.Upvotes,
-				&idea.Downvotes,
+				pq.Array(&idea.Tags),
 				&idea.Status,
+				&idea.LearningOutcome,
+				&idea.RecommendedLevel,
+				&idea.GitHubLink,
+				&idea.WebsiteLink,
 				&idea.Version,
 			)
 			if err != nil {
@@ -248,7 +254,7 @@ func (m ProfileModel) GetAllProfilesWithIdeas(limit int, offset int) ([]*UserPro
 			}
 
 			idea.Tags = tags
-			idea.SubmittedBy = profile.ID
+			idea.UserID = profile.ID
 			ideas = append(ideas, &idea)
 		}
 		ideaRows.Close()
