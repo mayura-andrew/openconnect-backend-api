@@ -47,6 +47,10 @@ type config struct {
 		redirectURI        string
 	}
 	frontendURL string
+
+	cors struct {
+		trustedOrigins []string
+	}
 }
 
 type application struct {
@@ -99,6 +103,15 @@ func main() {
 	flag.StringVar(&cfg.oauth.googleClientID, "oauth-google-client-id", os.Getenv("GOOGLE_CLIENT_ID"), "Google OAuth Client ID")
 	flag.StringVar(&cfg.oauth.googleClientSecret, "oauth-google-client-secret", os.Getenv("GOOGLE_CLIENT_SECRET"), "Google OAuth Client Secret")
 	flag.StringVar(&cfg.oauth.redirectURI, "oauth-redirect-url", os.Getenv("GOOGLE_REDIRECT_URI"), "OAuth Redirect URL")
+
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
+
+	cfg.cors.trustedOrigins = append(cfg.cors.trustedOrigins, "http://localhost:5173", "http://localhost:3000")
+	
+	flag.Parse()
 
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 	if logger == nil {
