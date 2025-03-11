@@ -43,6 +43,6 @@ func (app *application) routes() http.Handler {
 	//router.HandlerFunc(http.MethodGet, "/v1/profiles/:username", app.requirePermission("ideas:read", app.getProfileByUsernameHandler))
 
 	router.HandlerFunc(http.MethodGet, "/v1/profiles/id/:userId",  app.getProfileWithIdeasByUserIDHandler)
-	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
+	return app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router))))
 
 }
