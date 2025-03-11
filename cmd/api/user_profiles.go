@@ -444,7 +444,7 @@ func (app *application) getProfileWithIdeasByUserIDHandler(w http.ResponseWriter
 
 	userID, err := uuid.Parse(userIdParam)
 	if err != nil {
-        app.badRequestResponse(w, r, fmt.Errorf("invalid user ID: %s", err.Error()))
+		app.badRequestResponse(w, r, fmt.Errorf("invalid user ID: %s", err.Error()))
 		return
 	}
 
@@ -481,16 +481,16 @@ func (app *application) getProfileWithIdeasByUserIDHandler(w http.ResponseWriter
 	}
 
 	response := map[string]interface{}{
-		"profile": profile,
-		"ideas": ideas,
+		"profile":     profile,
+		"ideas":       ideas,
 		"ideas_count": totalCount,
-		"limit": limit,
-		"offset": offset,
-	}	
+		"limit":       limit,
+		"offset":      offset,
+	}
 
 	if profile.Avatar != "" && profile.Avatar != "no key" {
-        response["avatarURL"] = fmt.Sprintf("/v1/avatars/%s", profile.Avatar)
-    }
+		response["avatarURL"] = fmt.Sprintf("/v1/avatars/%s", profile.Avatar)
+	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"response": response}, nil)
 	if err != nil {
