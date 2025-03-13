@@ -128,6 +128,7 @@ func (app *application) updateProfileHandler(w http.ResponseWriter, r *http.Requ
 		Avatar    *string  `json:"avatar"`
 		Title     *string  `json:"title"`
 		Bio       *string  `json:"bio"`
+		Email    *string  `json:"email"`
 		Faculty   *string  `json:"faculty"`
 		Program   *string  `json:"program"`
 		Degree    *string  `json:"degree"`
