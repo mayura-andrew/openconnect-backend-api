@@ -255,11 +255,12 @@ func (app *application) getProfileHandler(w http.ResponseWriter, r *http.Request
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
 			profile = &data.UserProfile{
-				ID:        user.ID,
-				Username:  user.UserName,
-				Email:     user.Email,
-				UserType:  user.UserType,
-				CreatedAt: user.CreatedAt,
+				ID:                  user.ID,
+				Username:            user.UserName,
+				Email:               user.Email,
+				UserType:            user.UserType,
+				CreatedAt:           user.CreatedAt,
+				HasCompletedProfile: false,
 			}
 
 			// Return an empty profile with basic user information
@@ -280,6 +281,59 @@ func (app *application) getProfileHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"profile": response}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) getUserProfileHandler(w http.ResponseWriter, r *http.Request) {
+	// Get current user from context
+	user := app.contextGetUser(r)
+
+	fmt.Println(user)
+
+	// Get full profile
+	profile, err := app.models.UserProfile.GetUserProfile(user.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			profile = &data.UserProfile{
+				ID:                  user.ID,
+				Username:            user.UserName,
+				Email:               user.Email,
+				UserType:            user.UserType,
+				CreatedAt:           user.CreatedAt,
+				HasCompletedProfile: false,
+				Firstname:           "",
+				Lastname:            "",
+				Avatar:              "",
+				Title:               "",
+				Bio:                 "",
+				Faculty:             "",
+				Program:             "",
+				Degree:              "",
+				Year:                "",
+				Uni:                 "",
+				Mobile:              "",
+				LinkedIn:            "",
+				GitHub:              "",
+				FB:                  "",
+				Skills:              []string{},
+			}
+
+			// Return an empty profile with basic user information
+			err = app.writeJSON(w, http.StatusOK, envelope{"profile": profile}, nil)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+			}
+			return // No profile found, return empty profile
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"profile": profile}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -486,10 +540,6 @@ func (app *application) getProfileWithIdeasByUserIDHandler(w http.ResponseWriter
 		"ideas_count": totalCount,
 		"limit":       limit,
 		"offset":      offset,
-	}
-
-	if profile.Avatar != "" && profile.Avatar != "no key" {
-		response["avatarURL"] = fmt.Sprintf("/v1/avatars/%s", profile.Avatar)
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"response": response}, nil)
