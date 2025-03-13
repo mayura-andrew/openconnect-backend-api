@@ -830,9 +830,9 @@ func (m ProfileModel) Update(profile *Profile) error {
 	query := `
 		UPDATE user_profiles
 		SET firstname = $1, lastname = $2, avatar = $3, title = $4, bio = $5,
-		    faculty = $6, program = $7, degree = $8, year=$9 uni = $10, mobile = $11,
+		    faculty = $6, program = $7, degree = $8, year=$9, uni = $10, mobile = $11,
 		    linkedin = $12, github = $13, fb = $14,  updated_at = NOW()
-		WHERE user_id = $14
+		WHERE user_id = $15
 		RETURNING updated_at`
 
 	args := []any{
