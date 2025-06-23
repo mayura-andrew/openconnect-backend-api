@@ -29,9 +29,9 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/auth/google/login", app.googleLoginHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/auth/google/callback", app.googleCallbackHandler)
 
-	router.HandlerFunc(http.MethodGet, "/v1/profile", app.getProfileHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/profile", app.getUserProfileHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/profiles/search", app.searchProfilesHandler)
-	router.HandlerFunc(http.MethodPut, "/v1/profile/new", app.requirePermission("ideas:write", app.createProfileHandler))
+	router.HandlerFunc(http.MethodPost, "/v1/profile/new", app.requirePermission("ideas:write", app.createProfileHandler))
 	router.HandlerFunc(http.MethodPatch, "/v1/profile/update", app.requirePermission("ideas:write", app.updateProfileHandler))
 	router.HandlerFunc(http.MethodDelete, "/v1/profile/delete", app.requirePermission("ideas:write", app.deleteProfileHandler))
 	router.HandlerFunc(http.MethodGet, "/v1/profiles-with-ideas", app.listProfilesWithIdeasHandler)
@@ -43,6 +43,6 @@ func (app *application) routes() http.Handler {
 	//router.HandlerFunc(http.MethodGet, "/v1/profiles/:username", app.requirePermission("ideas:read", app.getProfileByUsernameHandler))
 
 	router.HandlerFunc(http.MethodGet, "/v1/profiles/id/:userId",  app.getProfileWithIdeasByUserIDHandler)
-	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
+	return app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router))))
 
 }

@@ -107,10 +107,10 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		user, err := app.models.Users.GetForToken(data.ScopeAuthentication, token)
 		if err != nil {
 			switch {
-				case errors.Is(err, data.ErrRecordNotFound):
-					app.invalidAuthenticationTokenResponse(w, r)
-				default:
-					app.serverErrorResponse(w, r, err)
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidAuthenticationTokenResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
 			}
 			return
 		}
@@ -125,7 +125,7 @@ func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.Han
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := app.contextGetUser(r)
 
-		if user.IsAnonymous(){
+		if user.IsAnonymous() {
 			app.authenticationRequiredResponse(w, r)
 			return
 		}
@@ -163,8 +163,37 @@ func (app *application) requirePermission(code string, next http.HandlerFunc) ht
 		}
 
 		next.ServeHTTP(w, r)
-		
+
 	}
 
 	return app.requireActivatedUser(fn)
+}
+
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		w.Header().Set("Vary", "Origin")
+		w.Header().Add("Vary", "Access-Control-Request-Method")
+
+		origin := r.Header.Get("Origin")
+
+		if origin != "" {
+			for i := range app.config.cors.trustedOrigins {
+				if origin == app.config.cors.trustedOrigins[i] {
+
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+
+					if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+						w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, PUT, PATCH, DELETE")
+						w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					break
+				}
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

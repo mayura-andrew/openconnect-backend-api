@@ -352,6 +352,145 @@ func (m ProfileModel) GetByUserID(userID uuid.UUID) (*Profile, error) {
 
 }
 
+func (m ProfileModel) GetUserProfile(userID uuid.UUID) (*UserProfile, error) {
+	query := `
+		SELECT u.id, u.user_name, u.email, u.user_type, u.created_at, u.has_profile_created,
+		       p.firstname, p.lastname, p.avatar, p.title, p.bio, 
+		       p.faculty, p.program, p.degree, p.year, p.uni, p.mobile, 
+		       p.linkedin, p.github, p.fb, p.updated_at
+		FROM users u
+		LEFT JOIN user_profiles p ON u.id = p.user_id
+		WHERE u.id = $1`
+
+	var profile UserProfile
+	var hasProfileCreated bool
+	var firstname, lastname, avatar, title, bio sql.NullString
+	var faculty, program, degree, year, uni, mobile sql.NullString
+	var linkedin, github, fb sql.NullString
+	var updatedAt sql.NullTime
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, userID).Scan(
+		&profile.ID,
+		&profile.Username,
+		&profile.Email,
+		&profile.UserType,
+		&profile.CreatedAt,
+		&hasProfileCreated,
+		&firstname,
+		&lastname,
+		&avatar,
+		&title,
+		&bio,
+		&faculty,
+		&program,
+		&degree,
+		&year,
+		&uni,
+		&mobile,
+		&linkedin,
+		&github,
+		&fb,
+		&updatedAt,
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	profile.HasCompletedProfile = hasProfileCreated
+	// Set nullable fields
+	if firstname.Valid {
+		profile.Firstname = firstname.String
+	}
+	if lastname.Valid {
+		profile.Lastname = lastname.String
+	}
+	if avatar.Valid {
+		profile.Avatar = avatar.String
+	}
+	if title.Valid {
+		profile.Title = title.String
+	}
+	if bio.Valid {
+		profile.Bio = bio.String
+	}
+	if faculty.Valid {
+		profile.Faculty = faculty.String
+	}
+	if program.Valid {
+		profile.Program = program.String
+	}
+	if degree.Valid {
+		profile.Degree = degree.String
+	}
+	if year.Valid {
+		profile.Year = year.String
+	}
+	if uni.Valid {
+		profile.Uni = uni.String
+	}
+	if mobile.Valid {
+		profile.Mobile = mobile.String
+	}
+	if linkedin.Valid {
+		profile.LinkedIn = linkedin.String
+	}
+	if github.Valid {
+		profile.GitHub = github.String
+	}
+	if fb.Valid {
+		profile.FB = fb.String
+	}
+	if updatedAt.Valid {
+		profile.UpdatedAt = updatedAt.Time
+	} else {
+		profile.UpdatedAt = profile.CreatedAt
+	}
+
+	if avatar.Valid && avatar.String != "" && avatar.String != "no key" {
+		profile.Avatar = avatar.String
+		profile.AvatarURL = "/v1/avatars/" + avatar.String
+	}
+	// Get skills for the profile
+	query = `
+		SELECT skill
+		FROM user_skills
+		WHERE user_id = $1
+	`
+
+	rows, err := m.DB.QueryContext(ctx, query, profile.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var skills []string
+	for rows.Next() {
+		var skill string
+		err := rows.Scan(&skill)
+		if err != nil {
+			return nil, err
+		}
+		skills = append(skills, skill)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	profile.Skills = skills
+
+	
+	return &profile, nil
+}
+
 func (m ProfileModel) GetFullProfile(userID uuid.UUID) (*UserProfile, error) {
 	query := `
 		SELECT u.id, u.user_name, u.email, u.user_type, u.created_at, u.has_profile_created,
@@ -691,9 +830,9 @@ func (m ProfileModel) Update(profile *Profile) error {
 	query := `
 		UPDATE user_profiles
 		SET firstname = $1, lastname = $2, avatar = $3, title = $4, bio = $5,
-		    faculty = $6, program = $7, degree = $8, year=$9 uni = $10, mobile = $11,
+		    faculty = $6, program = $7, degree = $8, year=$9, uni = $10, mobile = $11,
 		    linkedin = $12, github = $13, fb = $14,  updated_at = NOW()
-		WHERE user_id = $14
+		WHERE user_id = $15
 		RETURNING updated_at`
 
 	args := []any{
