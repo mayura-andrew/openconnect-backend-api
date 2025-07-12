@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -11,12 +11,14 @@ type contextKey string
 
 const userContextKey = contextKey("user")
 
-func (app *application) contextSetUser(r *http.Request, user *data.User) *http.Request {
+// ContextSetUser adds a user to the request context
+func (app *Application) ContextSetUser(r *http.Request, user *data.User) *http.Request {
 	ctx := context.WithValue(r.Context(), userContextKey, user)
 	return r.WithContext(ctx)
 }
 
-func (app *application) contextGetUser(r *http.Request) *data.User {
+// ContextGetUser retrieves a user from the request context
+func (app *Application) ContextGetUser(r *http.Request) *data.User {
 	user, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
 		panic("missing user value in request context")
