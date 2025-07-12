@@ -1,7 +1,3 @@
--- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS "citext";
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 CREATE TABLE IF NOT EXISTS ideas (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(255) NOT NULL,
@@ -12,5 +8,5 @@ CREATE TABLE IF NOT EXISTS ideas (
     category VARCHAR(100) NOT NULL,
     tags TEXT[] NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    version INT NOT NULL DEFAULT 1,
+    version INT NOT NULL DEFAULT 1
 );

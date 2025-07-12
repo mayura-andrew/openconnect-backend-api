@@ -1,1 +1,1 @@
-DROP TABLE IF EXITS tokens;
+DROP TABLE IF EXISTS tokens;
